@@ -41,12 +41,7 @@ node index.js
 - `/reminder [minutes] [message]` - Set a reminder
 - `/help` - Show all available commands
 
-### Legacy Commands (Prefix: !)
-- `!note [title] [content] [save_to_channel]` - Save a note
-- `!getnote [title]` - Retrieve a saved note
-- `!vote [question] [option1,option2,...] [save_to_channel]` - Create a poll
-- `!reminder [minutes] [message]` - Set a reminder
-- `!help` - Show all available commands
+
 
 ## Notes
 
