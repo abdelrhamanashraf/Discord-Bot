@@ -3,7 +3,6 @@ const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, REST, Rout
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const moment = require('moment-timezone');
 
 // Add view note state tracking
 const viewNoteStates = new Map();
@@ -852,7 +851,7 @@ client.on('interactionCreate', async (interaction) => {
                     )
                     .setFooter({ 
                         text: 'May your prayers be accepted',
-                        iconURL: 'https://img.lovepik.com/png/20231006/Simple-Elements-of-Blue-Mosque-Paper-cut-Style-ramazan-calligraphy_98116_wh1200.png'
+                        iconURL: `${THUMBNAILS.PRAYER}`
                     })
                     .setTimestamp();
 
@@ -1395,27 +1394,24 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Update the prayer time check function
+// Add prayer time check function
 async function checkPrayerTimes() {
-    const now = moment();
-    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
     for (const [userId, data] of prayerSubscriptions) {
         try {
             const response = await axios.get(`http://api.aladhan.com/v1/timingsByCity`, {
                 params: {
                     city: data.city,
                     country: data.country,
-                    method: 2, // ISNA method
-                    tune: '0,0,0,0,0,0,0,0,0' // Disable any time adjustments
+                    method: 2 // ISNA method
                 }
             });
 
             const timings = response.data.data.timings;
             const user = await client.users.fetch(userId);
-            
-            // Get the timezone for the user's location
-            const timezone = response.data.data.meta.timezone;
-            const localNow = now.clone().tz(timezone);
 
             // Check each prayer time
             const prayers = {
@@ -1428,10 +1424,9 @@ async function checkPrayerTimes() {
 
             for (const [prayer, time] of Object.entries(prayers)) {
                 const [hour, minute] = time.split(':').map(Number);
-                const prayerTime = localNow.clone().set({ hour, minute, second: 0 });
                 
                 // Check if it's time for prayer (within 1 minute)
-                if (Math.abs(localNow.diff(prayerTime, 'minutes')) <= 1) {
+                if (hour === currentHour && Math.abs(minute - currentMinute) <= 1) {
                     const embed = new EmbedBuilder()
                         .setTitle('🕌 Prayer Time')
                         .setDescription(`It's time for ${prayer} prayer!`)
@@ -1440,12 +1435,11 @@ async function checkPrayerTimes() {
                         .addFields(
                             { name: 'Prayer', value: prayer, inline: true },
                             { name: 'Time', value: time, inline: true },
-                            { name: 'Location', value: `${data.city}, ${data.country}`, inline: true },
-                            { name: 'Timezone', value: timezone, inline: true }
+                            { name: 'Location', value: `${data.city}, ${data.country}`, inline: true }
                         )
                         .setFooter({ 
                             text: 'May your prayers be accepted',
-                            iconURL: 'https://img.lovepik.com/png/20231006/Simple-Elements-of-Blue-Mosque-Paper-cut-Style-ramazan-calligraphy_98116_wh1200.png'
+                            iconURL: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png'
                         })
                         .setTimestamp();
 
