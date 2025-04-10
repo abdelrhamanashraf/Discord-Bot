@@ -1,58 +1,103 @@
 # Discord Bot
 
-A Discord bot with note-taking, voting, and reminder functionality that can only be used by specific roles.
+A feature-rich Discord bot with various utilities including notes, voting, reminders, prayer times, and fun commands.
 
 ## Features
 
-- 📝 Note taking and retrieval
-- 🗳️ Create polls with multiple options
-- ⏰ Set reminders
-- 🔒 Role-based command access
-- 💬 Slash commands support
-- 📢 Option to save notes and votes as channel messages
+### 📝 Notes
+- Save and manage personal notes
+- View all your notes with pagination
+- Share notes in channels
+- Edit and delete notes
+- Persistent storage
+
+Commands:
+- `/note [title] [content] [save_to_channel]` - Save a note
+- `/getnotes` - View all your notes
+- `/getnote [title]` - View a specific note
+
+### 🗳️ Voting
+- Create polls with multiple options
+- Automatic reaction management
+- Channel sharing option
+- Real-time vote counting
+
+Commands:
+- `/vote [question] [options] [save_to_channel]` - Create a poll
+
+### ⏰ Reminders
+- One-time reminders
+- Recurring reminders (zakerny)
+- Custom time intervals
+- DM notifications
+
+Commands:
+- `/reminder [minutes] [message]` - Set a one-time reminder
+- `/zakerny [message] [number] [unit]` - Set a recurring reminder
+- `/clear-zakerny` - Stop your recurring reminder
+
+### 🕌 Prayer Times
+- Daily prayer time notifications
+- Location-based prayer times
+- Subscription management
+- Beautiful prayer time embeds
+
+Commands:
+- `/prayer-subscribe [city] [country]` - Subscribe to prayer times
+- `/prayer-unsubscribe` - Unsubscribe from prayer times
+
+### 🎲 Fun Commands
+- Dice rolling
+- Random number generation
+- Coin tossing
+- Random name selection
+
+Commands:
+- `/roll [numbers] [names]` - Various random operations
+  - `/roll numbers:dice` - Roll a 6-sided dice
+  - `/roll numbers:1-100` - Random number between 1-100
+  - `/roll names:coin` - Toss a coin
+  - `/roll names:John,Mary,Alex` - Pick a random name
 
 ## Setup
 
-1. Install dependencies:
-```bash
-npm install
-```
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create a `.env` file with:
+   ```
+   DISCORD_TOKEN=your_bot_token
+   ALLOWED_ROLE_ID=your_role_id
+   ```
+4. Run the bot:
+   ```bash
+   node index.js
+   ```
 
-2. Create a `.env` file with the following content:
-```
-DISCORD_TOKEN=your_bot_token_here
-ALLOWED_ROLE_ID=your_role_id_here
-```
+## Requirements
 
-3. Replace `your_bot_token_here` with your Discord bot token
-4. Replace `your_role_id_here` with the ID of the role that should have access to the bot
+- Node.js 16.9.0 or higher
+- Discord.js 14.0.0 or higher
+- Other dependencies listed in package.json
 
-5. Start the bot:
-```bash
-node index.js
-```
+## Data Storage
 
-## Commands
+The bot uses JSON files for persistent storage:
+- `data/notes.json` - User notes
+- `data/prayers.json` - Prayer subscriptions
+- `data/zakerny.json` - Recurring reminders
 
-### Slash Commands (Recommended)
-- `/note [title] [content] [save_to_channel]` - Save a note
-- `/getnote [title]` - Retrieve a saved note
-- `/vote [question] [options] [save_to_channel]` - Create a poll
-- `/reminder [minutes] [message]` - Set a reminder
-- `/help` - Show all available commands
+## Permissions
 
-### Legacy Commands (Prefix: !)
-- `!note [title] [content] [save_to_channel]` - Save a note
-- `!getnote [title]` - Retrieve a saved note
-- `!vote [question] [option1,option2,...] [save_to_channel]` - Create a poll
-- `!reminder [minutes] [message]` - Set a reminder
-- `!help` - Show all available commands
+The bot requires the following permissions:
+- Send Messages
+- Embed Links
+- Add Reactions
+- Read Message History
+- Manage Messages (for polls)
 
-## Notes
+## Support
 
-- The bot will only respond to users who have the specified role
-- Notes are stored in memory and will be lost when the bot restarts
-- Reminders will be sent as direct messages
-- When using the `save_to_channel` option, notes and votes will be posted as messages in the current channel
-- For votes, options should be separated by commas when using slash commands
-- Slash commands provide a better user experience with built-in command descriptions and parameter validation 
+For issues or feature requests, please open an issue on the repository 
