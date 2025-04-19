@@ -220,9 +220,16 @@ async function checkPrayerTimes(client) {
 
 // Schedule function to check prayer times
 function schedulePrayerNotifications(client) {
+    // Run once immediately to check if any prayers are due now
+    checkPrayerTimes(client).catch(err => {
+        console.error('Error in initial prayer time check:', err);
+    });
+    
     // Check every minute
     setInterval(() => {
-        checkPrayerTimes(client);
+        checkPrayerTimes(client).catch(err => {
+            console.error('Error in scheduled prayer time check:', err);
+        });
     }, 60 * 1000); // Check every minute
     
     console.log('Prayer time notifications scheduled');

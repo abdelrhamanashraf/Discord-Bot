@@ -44,6 +44,16 @@ module.exports = {
                     inline: false
                 },
                 { 
+                    name: '🎮 Steam Games', 
+                    value: '```/steam-top\nGet the top 10 most played games on Steam\n\n/steam-search [query]\nSearch for a game on Steam\n\n/steam-genre [genre]\nGet top-rated games by genre on Steam```',
+                    inline: false
+                },
+                { 
+                    name: '🎬 Anime Information', 
+                    value: '```/anime-current\nGet a list of anime from the current season\n\n/anime-search [query]\nSearch for an anime by name\n\n/anime-top [genre]\nGet a list of top-rated anime, optionally filtered by genre\n\n/anime-season [year] [season]\nGet anime from a specific year and season```',
+                    inline: false
+                },
+                { 
                     name: '🎲 Fun Commands', 
                     value: '```/roll [numbers] [names]\nRoll a dice, pick a random number, or toss a coin\nExamples:\n/roll numbers:dice - Roll a 6-sided dice\n/roll numbers:1-100 - Random number between 1-100\n/roll names:coin - Toss a coin\n/roll names:John,Mary,Alex - Pick a random name```',
                     inline: false

@@ -36,6 +36,7 @@ for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
   try {
     const commandModule = require(filePath);
+    console.log(`Loading commands from ${file}...`);
 
     // Handle both single command exports and array exports
     const commands = Array.isArray(commandModule)
@@ -49,7 +50,8 @@ for (const file of commandFiles) {
         continue;
       }
 
-      if (!command.execute || typeof command.execute !== "function") {
+      // Special case for prayer-notifications - we need execute function but it's optional
+      if (!command.execute && command.name !== "prayer-notifications") {
         console.warn(
           `Command ${command.name} in ${file} is missing an execute function!`
         );
@@ -64,7 +66,7 @@ for (const file of commandFiles) {
   }
 }
 
-// Add the missing hasRequiredRole function
+
 function hasRequiredRole(member) {
   return member.roles.cache.has(process.env.ALLOWED_ROLE_ID);
 }
@@ -253,7 +255,15 @@ const commands = [
   },
   {
     name: "anime-top",
-    description: "Get a list of top-rated anime"
+    description: "Get a list of top-rated anime, optionally filtered by genre",
+    options: [
+      {
+        name: "genre",
+        type: 3, // STRING
+        description: "Filter by genre (e.g., Action, Romance, Comedy)",
+        required: false
+      }
+    ]
   },
   {
     name: "anime-search",
@@ -266,7 +276,60 @@ const commands = [
         required: true
       }
     ]
-  }
+  },
+  
+  {
+    name: "anime-season",
+    description: "Get anime from a specific year and season",
+    options: [
+      {
+        name: "year",
+        type: 4, // INTEGER
+        description: "The year (e.g., 2023)",
+        required: true
+      },
+      {
+        name: "season",
+        type: 3, // STRING
+        description: "The season (winter, spring, summer, fall)",
+        required: true,
+        choices: [
+          { name: "Winter", value: "winter" },
+          { name: "Spring", value: "spring" },
+          { name: "Summer", value: "summer" },
+          { name: "Fall", value: "fall" }
+        ]
+      }
+    ]
+  },
+  {
+    name: "steam-top",
+    description: "Get the top 10 most played games on Steam",
+  },
+  {
+    name: "steam-search",
+    description: "Search for a game on Steam",
+    options: [
+      {
+        name: "query",
+        type: 3, // STRING
+        description: "The game title to search for",
+        required: true
+      }
+    ]
+  },
+  {
+    name: "steam-genre",
+    description: "Get top rated games by genre on Steam",
+    options: [
+      {
+        name: "genre",
+        type: 3, // STRING
+        description: "The genre to search for (e.g., Action, RPG, Strategy)",
+        required: true
+      }
+    ]
+  },
 ];
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
@@ -277,9 +340,32 @@ client.once("ready", () => {
   client.user.setActivity("/help| Meow", { type: ActivityType.Listening });
 
   // Initialize prayer notifications
-  const prayerModule = client.commands.get("prayer-subscribe");
+  console.log("Attempting to initialize prayer notifications...");
+  
+  // First try to find the prayer-notifications command directly
+  let prayerModule = client.commands.get("prayer-notifications");
+  
+  // If not found directly, try to find it by searching all commands
+  if (!prayerModule || !prayerModule.initPrayerNotifications) {
+    console.log("Prayer-notifications command not found directly, searching all commands...");
+    
+    for (const [name, command] of client.commands.entries()) {
+      console.log(`Checking command: ${name}`);
+      if (command.initPrayerNotifications) {
+        console.log(`Found prayer notifications in command: ${name}`);
+        prayerModule = command;
+        break;
+      }
+    }
+  }
+  
   if (prayerModule && prayerModule.initPrayerNotifications) {
+    console.log("Found prayer module, initializing notifications...");
     prayerModule.initPrayerNotifications(client);
+    console.log("Prayer notifications initialized successfully");
+  } else {
+    console.error("Prayer module not found or missing initPrayerNotifications function");
+    console.log("Available commands:", Array.from(client.commands.keys()).join(", "));
   }
 
   // Register commands after the bot is ready
@@ -301,6 +387,9 @@ client.once("ready", () => {
 
 // Single interactionCreate event handler
 client.on("interactionCreate", async (interaction) => {
+  if (!hasRequiredRole(interaction.member)) {
+    return interaction.reply({ content: 'You do not have permission to use this bot.', ephemeral: true });
+}
   // Handle command interactions
   if (interaction.isCommand()) {
     console.log(`Received command: ${interaction.commandName}`);

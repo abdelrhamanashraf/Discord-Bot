@@ -1,6 +1,6 @@
 # Discord Bot
 
-A feature-rich Discord bot with various utilities including notes, voting, reminders, prayer times, and fun commands.
+A feature-rich Discord bot with various utilities including notes, voting, reminders, prayer times, anime information, Steam game data, and fun commands.
 
 ## Features
 
@@ -32,7 +32,7 @@ Commands:
 - DM notifications
 
 Commands:
-- `/reminder [minutes] [message]` - Set a one-time reminder
+- `/remind [message] [time] [unit]` - Set a one-time reminder
 - `/zakerny [message] [number] [unit]` - Set a recurring reminder
 - `/clear-zakerny` - Stop your recurring reminder
 
@@ -45,6 +45,29 @@ Commands:
 Commands:
 - `/prayer-subscribe [city] [country]` - Subscribe to prayer times
 - `/prayer-unsubscribe` - Unsubscribe from prayer times
+
+### 🎮 Steam Games
+- Browse top games on Steam
+- Search for specific games
+- View game details and ratings
+- Find top-rated games by genre
+
+Commands:
+- `/steam-top` - Get the top 10 most played games on Steam
+- `/steam-search [query]` - Search for a game on Steam
+- `/steam-genre [genre]` - Get top-rated games by genre
+
+### 🎬 Anime Information
+- Browse current season anime
+- Search for specific anime
+- View anime details and ratings
+- Browse anime by season and year
+
+Commands:
+- `/anime-current` - Get a list of anime from the current season
+- `/anime-search [query]` - Search for an anime by name
+- `/anime-top [genre]` - Get a list of top-rated anime, optionally filtered by genre
+- `/anime-season [year] [season]` - Get anime from a specific year and season
 
 ### 🎲 Fun Commands
 - Dice rolling
@@ -87,7 +110,7 @@ Commands:
 The bot uses JSON files for persistent storage:
 - `data/notes.json` - User notes
 - `data/prayers.json` - Prayer subscriptions
-- `data/zakerny.json` - Recurring reminders
+
 
 ## Permissions
 
@@ -100,4 +123,4 @@ The bot requires the following permissions:
 
 ## Support
 
-For issues or feature requests, please open an issue on the repository 
+For issues or feature requests, please open an issue on the repository
