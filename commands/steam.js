@@ -78,19 +78,41 @@ async function getGameDetails(appId) {
 // Function to search for games
 async function searchGames(query) {
     try {
-        const response = await axios.get('https://steamcommunity.com/actions/SearchApps', {
+        // Try the Steam community search first
+        let response = await axios.get('https://steamcommunity.com/actions/SearchApps', {
             params: {
                 term: query
             }
         });
 
-        if (!response.data || !Array.isArray(response.data)) {
+        let results = [];
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+            results = response.data;
+        } else {
+            // If no results, try the Steam store search API
+            response = await axios.get('https://store.steampowered.com/api/storesearch', {
+                params: {
+                    term: query,
+                    l: 'english',
+                    cc: 'US'
+                }
+            });
+            
+            if (response.data && response.data.items && Array.isArray(response.data.items)) {
+                results = response.data.items.map(item => ({
+                    appid: item.id,
+                    name: item.name
+                }));
+            }
+        }
+
+        if (results.length === 0) {
             return [];
         }
 
-        // Get detailed info for the top 5 results
+        // Get detailed info for the top 8 results
         const detailedResults = await Promise.all(
-            response.data.slice(0, 5).map(async (game) => {
+            results.slice(0, 8).map(async (game) => {
                 try {
                     const details = await getGameDetails(game.appid);
                     return {
@@ -104,10 +126,224 @@ async function searchGames(query) {
             })
         );
 
-        return detailedResults;
+        // Filter out games with no details
+        return detailedResults.filter(game => game.details);
     } catch (error) {
         console.error('Error searching games:', error);
         return [];
+    }
+}
+
+// Command handler for game search
+async function handleGameSearch(interaction) {
+    const query = interaction.options.getString('query');
+    
+    await interaction.deferReply();
+    
+    try {
+        const searchResults = await searchGames(query);
+        
+        if (!searchResults || searchResults.length === 0) {
+            return interaction.editReply(`No games found matching "${query}". Try a different search term.`);
+        }
+        
+        // If we have multiple results, show a selection menu
+        if (searchResults.length > 1) {
+            const embed = new EmbedBuilder()
+                .setTitle(`Search Results for "${query}"`)
+                .setColor('#1b2838')
+                .setDescription('Select a game to view details:')
+                .setTimestamp()
+                .setFooter({ text: 'Data from Steam API' });
+            
+            // Show the first 5 results
+            const displayResults = searchResults.slice(0, 5);
+            
+            displayResults.forEach((game, index) => {
+                const details = game.details;
+                let fieldValue = 'No additional information available';
+                
+                if (details) {
+                    const genres = details.genres ? details.genres.map(g => g.description).join(', ') : 'N/A';
+                    const price = details.price_overview ? details.price_overview.final_formatted : 'Free/Not Available';
+                    fieldValue = `💰 ${price} | 🎮 ${genres}`;
+                }
+                
+                embed.addFields({
+                    name: `${index + 1}. ${game.name}`,
+                    value: fieldValue
+                });
+            });
+            
+            if (displayResults[0]?.details?.header_image) {
+                embed.setThumbnail(displayResults[0].details.header_image);
+            }
+            
+            // Create buttons for each result
+            const row = new ActionRowBuilder();
+            
+            displayResults.forEach((game, index) => {
+                row.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`steam_select_game_${game.appid}`)
+                        .setLabel(`${index + 1}`)
+                        .setStyle(ButtonStyle.Primary)
+                );
+            });
+            
+            return interaction.editReply({ embeds: [embed], components: [row] });
+        }
+        
+        // If only one result, show it directly
+        const game = searchResults[0];
+        const details = game.details;
+        
+        return showGameDetails(interaction, game, details);
+    } catch (error) {
+        console.error('Error handling game search command:', error);
+        return interaction.editReply('An error occurred while searching for games.');
+    }
+}
+
+// Function to show game details
+async function showGameDetails(interaction, game, details) {
+    const embed = new EmbedBuilder()
+        .setTitle(details.name)
+        .setColor('#1b2838')
+        .setURL(`https://store.steampowered.com/app/${game.appid}`)
+        .setDescription(details.short_description || 'No description available.')
+        .setTimestamp();
+    
+    if (details.header_image) {
+        embed.setImage(details.header_image);
+    }
+    
+    // Add game details
+    const fields = [];
+    
+    if (details.genres && details.genres.length > 0) {
+        fields.push({
+            name: 'Genres',
+            value: details.genres.map(g => g.description).join(', '),
+            inline: true
+        });
+    }
+    
+    if (details.metacritic) {
+        fields.push({
+            name: 'Metacritic Score',
+            value: `${details.metacritic.score}/100`,
+            inline: true
+        });
+    }
+    
+    if (details.price_overview) {
+        fields.push({
+            name: 'Price',
+            value: details.price_overview.final_formatted,
+            inline: true
+        });
+    }
+    
+    if (details.release_date) {
+        fields.push({
+            name: 'Release Date',
+            value: details.release_date.date || 'Unknown',
+            inline: true
+        });
+    }
+    
+    if (details.developers) {
+        fields.push({
+            name: 'Developers',
+            value: details.developers.join(', '),
+            inline: true
+        });
+    }
+    
+    if (details.publishers) {
+        fields.push({
+            name: 'Publishers',
+            value: details.publishers.join(', '),
+            inline: true
+        });
+    }
+    
+    embed.addFields(fields);
+    
+    // Add Steam ID
+    embed.addFields({
+        name: 'Steam App ID',
+        value: `${game.appid}`,
+        inline: true
+    });
+    
+    // Add buttons
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setLabel('View on Steam')
+                .setStyle(ButtonStyle.Link)
+                .setURL(`https://store.steampowered.com/app/${game.appid}`)
+        );
+    
+    return interaction.editReply({ embeds: [embed], components: [row] });
+}
+
+// Button handler for showing more search results and selecting games
+async function handleButton(interaction) {
+    if (interaction.customId.startsWith('steam_more_results_')) {
+        // Handle more results button
+        await interaction.deferUpdate();
+        
+        const query = interaction.customId.replace('steam_more_results_', '');
+        
+        try {
+            const searchResults = await searchGames(query);
+            
+            if (!searchResults || searchResults.length <= 1) {
+                return interaction.editReply('No additional results found.');
+            }
+            
+            const embed = new EmbedBuilder()
+                .setTitle(`Search Results for "${query}"`)
+                .setColor('#1b2838')
+                .setDescription('Here are additional search results:')
+                .setTimestamp();
+            
+            // Skip the first result (already shown) and show the rest
+            searchResults.slice(1).forEach((game, index) => {
+                embed.addFields({
+                    name: `${index + 2}. ${game.name}`,
+                    value: `🔗 [View on Steam](https://store.steampowered.com/app/${game.appid})`
+                });
+            });
+            
+            return interaction.editReply({ embeds: [embed], components: [] });
+        } catch (error) {
+            console.error('Error handling more results button:', error);
+            return interaction.editReply('An error occurred while fetching more results.');
+        }
+    } else if (interaction.customId.startsWith('steam_select_game_')) {
+        // Handle game selection button
+        await interaction.deferUpdate();
+        
+        const appId = interaction.customId.replace('steam_select_game_', '');
+        
+        try {
+            const details = await getGameDetails(appId);
+            
+            if (!details) {
+                return interaction.editReply('Unable to fetch details for this game.');
+            }
+            
+            const game = { appid: appId, name: details.name, details };
+            
+            return showGameDetails(interaction, game, details);
+        } catch (error) {
+            console.error('Error handling game selection button:', error);
+            return interaction.editReply('An error occurred while fetching game details.');
+        }
     }
 }
 
@@ -186,9 +422,14 @@ async function handleTopGames(interaction) {
             .setFooter({ text: 'Data from Steam API' });
         
         topGames.forEach((game, index) => {
+            // Add null checks and fallbacks for all properties
+            const playerCount = game.player_count ? game.player_count.toLocaleString() : 'N/A';
+            const rating = game.rating || 'N/A';
+            const price = game.price || 'Free/Not Available';
+            
             embed.addFields({
                 name: `${index + 1}. ${game.name}`,
-                value: `👥 Players: ${game.player_count.toLocaleString()}\n⭐ Rating: ${game.rating}\n💰 Price: ${game.price}`
+                value: `👥 Players: ${playerCount}\n⭐ Rating: ${rating}\n💰 Price: ${price}`
             });
         });
         
