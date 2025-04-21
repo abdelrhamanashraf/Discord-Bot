@@ -23,7 +23,7 @@ Commands:
 - Real-time vote counting
 
 Commands:
-- `/vote [question] [options] [save_to_channel]` - Create a poll
+- `/vote [question] [options]` - Create a poll
 
 ### ⏰ Reminders
 - One-time reminders
