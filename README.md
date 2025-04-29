@@ -1,5 +1,6 @@
 # Discord Bot
 
+
 A feature-rich Discord bot with various utilities including notes, voting, reminders, prayer times, anime information, Steam game data, movies & TV series information, and fun commands.
 
 ## Features
