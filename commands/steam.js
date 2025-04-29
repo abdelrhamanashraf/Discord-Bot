@@ -12,6 +12,7 @@ const CACHE_TIMES = {
     GAME_DETAILS: 345600000, // 4 days for game details
     SEARCH: 345600000,       // 4 days for search results
     GENRE: 345600000         // 4 days for genre data
+    
 };
 
 // Function to get the most played games on Steam
