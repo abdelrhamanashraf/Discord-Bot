@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const axios = require('axios');
+const { getCachedData, setCachedData } = require('../utils/cacheManager');
 
 // Base URL for Jikan API (unofficial MyAnimeList API)
 const API_BASE_URL = 'https://api.jikan.moe/v4';
@@ -8,8 +9,28 @@ const API_BASE_URL = 'https://api.jikan.moe/v4';
 const apiCooldown = new Map();
 const COOLDOWN_MS = 400; // Wait 400ms between requests
 
-// Helper function to handle API requests with cooldown
-async function apiRequest(endpoint) {
+// Cache expiration times
+const CACHE_TIMES = {
+    SEARCH: 345600000, // 1 hour for search results
+    TOP: 21600000,   // 6 hours for top anime
+    SEASON: 345600000 // 24 hours for seasonal anime
+};
+
+// Helper function to handle API requests with cooldown and caching
+async function apiRequest(endpoint, cacheTime = CACHE_TIMES.SEARCH) {
+    // Generate cache key from endpoint
+    const cacheKey = `anime_${endpoint.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    
+    // Try to get data from cache first
+    const cachedData = await getCachedData(cacheKey, cacheTime);
+    if (cachedData) {
+        console.log(`Using cached data for ${endpoint}`);
+        return cachedData;
+    }
+    
+    // If not in cache, make API request
+    console.log(`Making API request for ${endpoint}`);
+    
     // Check if we need to wait before making another request
     const now = Date.now();
     const lastRequest = apiCooldown.get('lastRequest') || 0;
@@ -24,6 +45,10 @@ async function apiRequest(endpoint) {
     
     try {
         const response = await axios.get(`${API_BASE_URL}${endpoint}`);
+        
+        // Cache the response data
+        await setCachedData(cacheKey, response.data);
+        
         return response.data;
     } catch (error) {
         console.error(`Error fetching from Jikan API (${endpoint}):`, error.message);
@@ -90,7 +115,7 @@ async function handleCurrentSeason(interaction) {
     await interaction.deferReply();
     
     try {
-        const data = await apiRequest('/seasons/now');
+        const data = await apiRequest('/seasons/now', CACHE_TIMES.SEASON);
         const animeList = data.data.slice(0, 10); // Get top 10 anime from current season
         
         if (animeList.length === 0) {
@@ -143,7 +168,7 @@ async function handleTopAnime(interaction) {
         
         if (genre) {
             // First, get the genre ID from the name
-            const genresData = await apiRequest('/genres/anime');
+            const genresData = await apiRequest('/genres/anime', CACHE_TIMES.TOP);
             const genres = genresData.data;
             
             const genreObj = genres.find(g => g.name.toLowerCase() === genre.toLowerCase());
@@ -153,7 +178,7 @@ async function handleTopAnime(interaction) {
             }
             
             // Now get anime by genre ID
-            data = await apiRequest(`/anime?genres=${genreObj.mal_id}&order_by=score&sort=desc&limit=10`);
+            data = await apiRequest(`/anime?genres=${genreObj.mal_id}&order_by=score&sort=desc&limit=10`, CACHE_TIMES.TOP);
             animeList = data.data;
             title = `🎭 Top ${genre} Anime`;
             description = `Here are the top rated ${genre} anime:`;
@@ -166,7 +191,7 @@ async function handleTopAnime(interaction) {
             });
         } else {
             // Default behavior - get overall top anime
-            data = await apiRequest('/top/anime?limit=10');
+            data = await apiRequest('/top/anime?limit=10', CACHE_TIMES.TOP);
             animeList = data.data;
             title = '🏆 Top Anime';
             description = 'Here are the top rated anime of all time:';
@@ -219,7 +244,7 @@ async function handleAnimeSearch(interaction) {
     await interaction.deferReply();
     
     try {
-        const data = await apiRequest(`/anime?q=${encodeURIComponent(query)}&limit=10`);
+        const data = await apiRequest(`/anime?q=${encodeURIComponent(query)}&limit=10`, CACHE_TIMES.SEARCH);
         const animeList = data.data;
         
         if (animeList.length === 0) {
@@ -277,7 +302,7 @@ async function handleAnimeBySeason(interaction) {
     await interaction.deferReply();
     
     try {
-        const data = await apiRequest(`/seasons/${year}/${season.toLowerCase()}`);
+        const data = await apiRequest(`/seasons/${year}/${season.toLowerCase()}`, CACHE_TIMES.SEASON);
         const animeList = data.data.slice(0, 10); // Get top 10 anime from the specified season
         
         if (animeList.length === 0) {

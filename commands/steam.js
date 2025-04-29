@@ -1,13 +1,33 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const axios = require('axios');
+const { getCachedData, setCachedData } = require('../utils/cacheManager');
 require('dotenv').config();
 
 // Steam API key should be in your .env file
 const STEAM_API_KEY = process.env.STEAM_API_KEY;
 
+// Cache expiration times
+const CACHE_TIMES = {
+    TOP_GAMES: 345600000,     // 4 days for top games
+    GAME_DETAILS: 345600000, // 4 days for game details
+    SEARCH: 345600000,       // 4 days for search results
+    GENRE: 345600000         // 4 days for genre data
+};
+
 // Function to get the most played games on Steam
 async function getTopGames() {
     try {
+        // Check cache first
+        const cacheKey = 'steam_top_games';
+        const cachedData = await getCachedData(cacheKey, CACHE_TIMES.TOP_GAMES);
+        
+        if (cachedData) {
+            console.log('Using cached top games data');
+            return cachedData;
+        }
+        
+        console.log('Fetching fresh top games data');
+        
         // Get the most played games from Steam API
         const response = await axios.get('https://api.steampowered.com/ISteamChartsService/GetMostPlayedGames/v1/', {
             params: {
@@ -48,6 +68,9 @@ async function getTopGames() {
             })
         );
 
+        // Cache the results
+        await setCachedData(cacheKey, detailedGames);
+        
         return detailedGames;
     } catch (error) {
         console.error('Error fetching top games:', error);
@@ -58,6 +81,17 @@ async function getTopGames() {
 // Function to get game details by appID
 async function getGameDetails(appId) {
     try {
+        // Check cache first
+        const cacheKey = `steam_game_${appId}`;
+        const cachedData = await getCachedData(cacheKey, CACHE_TIMES.GAME_DETAILS);
+        
+        if (cachedData) {
+            console.log(`Using cached data for game ${appId}`);
+            return cachedData;
+        }
+        
+        console.log(`Fetching fresh data for game ${appId}`);
+        
         const response = await axios.get('https://store.steampowered.com/api/appdetails', {
             params: {
                 appids: appId
@@ -68,7 +102,12 @@ async function getGameDetails(appId) {
             return null;
         }
 
-        return response.data[appId].data;
+        const gameData = response.data[appId].data;
+        
+        // Cache the results
+        await setCachedData(cacheKey, gameData);
+        
+        return gameData;
     } catch (error) {
         console.error(`Error fetching game details for ${appId}:`, error);
         return null;
@@ -78,19 +117,52 @@ async function getGameDetails(appId) {
 // Function to search for games
 async function searchGames(query) {
     try {
-        const response = await axios.get('https://steamcommunity.com/actions/SearchApps', {
+        // Check cache first
+        const cacheKey = `steam_search_${query.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const cachedData = await getCachedData(cacheKey, CACHE_TIMES.SEARCH);
+        
+        if (cachedData) {
+            console.log(`Using cached search results for "${query}"`);
+            return cachedData;
+        }
+        
+        console.log(`Performing fresh search for "${query}"`);
+        
+        // Try the Steam community search first
+        let response = await axios.get('https://steamcommunity.com/actions/SearchApps', {
             params: {
                 term: query
             }
         });
 
-        if (!response.data || !Array.isArray(response.data)) {
+        let results = [];
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+            results = response.data;
+        } else {
+            // If no results, try the Steam store search API
+            response = await axios.get('https://store.steampowered.com/api/storesearch', {
+                params: {
+                    term: query,
+                    l: 'english',
+                    cc: 'US'
+                }
+            });
+            
+            if (response.data && response.data.items && Array.isArray(response.data.items)) {
+                results = response.data.items.map(item => ({
+                    appid: item.id,
+                    name: item.name
+                }));
+            }
+        }
+
+        if (results.length === 0) {
             return [];
         }
 
-        // Get detailed info for the top 5 results
+        // Get detailed info for the top 8 results
         const detailedResults = await Promise.all(
-            response.data.slice(0, 5).map(async (game) => {
+            results.slice(0, 8).map(async (game) => {
                 try {
                     const details = await getGameDetails(game.appid);
                     return {
@@ -104,63 +176,84 @@ async function searchGames(query) {
             })
         );
 
-        return detailedResults;
+        // Filter out games with no details
+        const filteredResults = detailedResults.filter(game => game.details);
+        
+        // Cache the results
+        await setCachedData(cacheKey, filteredResults);
+        
+        return filteredResults;
     } catch (error) {
         console.error('Error searching games:', error);
         return [];
     }
 }
 
-// Function to get top rated games by genre
+// Function to get top rated games by genre using RAWG API
 async function getTopRatedByGenre(genre) {
     try {
-        // First get a list of games to check
-        const response = await axios.get('https://api.steampowered.com/ISteamApps/GetAppList/v2/');
+        // Check cache first
+        const cacheKey = `rawg_genre_${genre.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const cachedData = await getCachedData(cacheKey, CACHE_TIMES.GENRE);
         
-        if (!response.data || !response.data.applist || !response.data.applist.apps) {
+        if (cachedData) {
+            console.log(`Using cached genre data for "${genre}"`);
+            return cachedData;
+        }
+        
+        console.log(`Fetching fresh genre data for "${genre}"`);
+        
+        // You'll need to sign up for a free API key at https://rawg.io/apidocs
+        const RAWG_API_KEY = process.env.RAWG_API_KEY; // Add this to your .env file
+        
+        // First, find the genre ID
+        const genreResponse = await axios.get(`https://api.rawg.io/api/genres`, {
+            params: {
+                key: RAWG_API_KEY
+            }
+        });
+        
+        if (!genreResponse.data || !genreResponse.data.results) {
             return [];
         }
         
-        // This is a huge list, so we'll sample some games
-        const sampleApps = response.data.applist.apps
-            .sort(() => 0.5 - Math.random()) // Shuffle
-            .slice(0, 100); // Take 100 random games
+        // Find the genre that matches our search
+        const genreData = genreResponse.data.results.find(g => 
+            g.name.toLowerCase() === genre.toLowerCase()
+        );
         
-        // Check each game for the genre and rating
-        const genreGames = [];
-        
-        for (const app of sampleApps) {
-            try {
-                const details = await getGameDetails(app.appid);
-                
-                if (details && details.genres) {
-                    const hasGenre = details.genres.some(g => 
-                        g.description.toLowerCase() === genre.toLowerCase()
-                    );
-                    
-                    if (hasGenre && details.metacritic && details.metacritic.score) {
-                        genreGames.push({
-                            appid: app.appid,
-                            name: details.name,
-                            score: details.metacritic.score,
-                            header_image: details.header_image,
-                            price: details.price_overview?.final_formatted || 'Free/Not Available'
-                        });
-                    }
-                }
-            } catch (error) {
-                // Skip errors for individual games
-                continue;
-            }
-            
-            // If we have 10 games, stop searching
-            if (genreGames.length >= 10) {
-                break;
-            }
+        if (!genreData) {
+            return []; // Genre not found
         }
         
-        // Sort by score
-        return genreGames.sort((a, b) => b.score - a.score);
+        // Get games for this genre, sorted by rating
+        const gamesResponse = await axios.get(`https://api.rawg.io/api/games`, {
+            params: {
+                key: RAWG_API_KEY,
+                genres: genreData.id,
+                ordering: '-rating', // Sort by rating descending
+                page_size: 10 // Limit to 10 results
+            }
+        });
+        
+        if (!gamesResponse.data || !gamesResponse.data.results) {
+            return [];
+        }
+        
+        // Format the results
+        const formattedResults = gamesResponse.data.results.map(game => ({
+            appid: game.id,
+            name: game.name,
+            score: Math.round(game.rating * 20), // Convert 5-star rating to 100-point scale
+            header_image: game.background_image,
+            price: 'Check on Steam', // RAWG doesn't provide pricing info
+            platforms: game.platforms?.map(p => p.platform.name).join(', ') || 'Various'
+        }));
+        
+        // Cache the results
+        await setCachedData(cacheKey, formattedResults);
+        
+        return formattedResults;
     } catch (error) {
         console.error('Error getting top rated games by genre:', error);
         return [];
@@ -181,20 +274,34 @@ async function handleTopGames(interaction) {
         const embed = new EmbedBuilder()
             .setTitle('🎮 Top 10 Most Played Games on Steam')
             .setColor('#1b2838')
-            .setDescription('Here are the current most played games on Steam:')
+            .setDescription('Here are the current most played games on Steam based on player count:')
             .setTimestamp()
-            .setFooter({ text: 'Data from Steam API' });
+            .setThumbnail('https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/512px-Steam_icon_logo.svg.png')
+            .setFooter({ 
+                text: 'Data from Steam API • Updated just now', 
+                iconURL: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/steamworks_logo.png' 
+            });
+        
+        // Add a separator field for better organization
+        embed.addFields({ name: '───────────── TOP GAMES ─────────────', value: '\u200B' });
         
         topGames.forEach((game, index) => {
+            // Add null checks and fallbacks for all properties
+            const playerCount = game.player_count ? game.player_count.toLocaleString() : 'N/A';
+            const rating = game.rating || 'N/A';
+            const price = game.price || 'Free/Not Available';
+            
+            // Create medal emojis for top 3
+            let medal = '';
+            if (index === 0) medal = '🥇 ';
+            else if (index === 1) medal = '🥈 ';
+            else if (index === 2) medal = '🥉 ';
+            
             embed.addFields({
-                name: `${index + 1}. ${game.name}`,
-                value: `👥 Players: ${game.player_count.toLocaleString()}\n⭐ Rating: ${game.rating}\n💰 Price: ${game.price}`
+                name: `${medal}${index + 1}. ${game.name}`,
+                value: `👥 **Current Players:** ${playerCount}\n⭐ **Rating:** ${rating}/100\n💰 **Price:** ${price}\n🔗 [View on Steam](https://store.steampowered.com/app/${game.appid})`
             });
         });
-        
-        if (topGames[0]?.header_image) {
-            embed.setThumbnail(topGames[0].header_image);
-        }
         
         return interaction.editReply({ embeds: [embed] });
     } catch (error) {
@@ -304,12 +411,12 @@ async function handleGameSearch(interaction) {
             );
         
         if (searchResults.length > 1) {
-            // Add a button to show more results
+            // Add a button to show more results - now opens Steam search page
             row.addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`steam_more_results_${query}`)
                     .setLabel('Show More Results')
-                    .setStyle(ButtonStyle.Secondary)
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://store.steampowered.com/search/?term=${encodeURIComponent(query)}`)
             );
         }
         
@@ -334,22 +441,39 @@ async function handleTopRatedByGenre(interaction) {
         }
         
         const embed = new EmbedBuilder()
-            .setTitle(`🏆 Top Rated ${genre} Games on Steam`)
+            .setTitle(`🏆 Top Rated ${genre} Games`)
             .setColor('#1b2838')
-            .setDescription(`Here are the top rated ${genre} games on Steam:`)
+            .setDescription(`Discover the highest-rated ${genre} games on Steam based on Metacritic scores:`)
             .setTimestamp()
-            .setFooter({ text: 'Data from Steam API' });
+            .setThumbnail('https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/512px-Steam_icon_logo.svg.png')
+            .setFooter({ 
+                text: `Genre: ${genre} • Data from Steam API • Updated just now`, 
+                iconURL: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/steamworks_logo.png' 
+            });
+        
+        // Add a separator field for better organization
+        embed.addFields({ name: `───────────── TOP ${genre.toUpperCase()} GAMES ─────────────`, value: '\u200B' });
         
         topRatedGames.forEach((game, index) => {
+            // Create medal emojis for top 3
+            let medal = '';
+            if (index === 0) medal = '🥇 ';
+            else if (index === 1) medal = '🥈 ';
+            else if (index === 2) medal = '🥉 ';
+            
+            // Format the score with stars based on rating
+            let scoreDisplay = `${game.score}/100`;
+            if (game.score >= 90) scoreDisplay = '⭐⭐⭐⭐⭐ ' + scoreDisplay;
+            else if (game.score >= 80) scoreDisplay = '⭐⭐⭐⭐ ' + scoreDisplay;
+            else if (game.score >= 70) scoreDisplay = '⭐⭐⭐ ' + scoreDisplay;
+            else if (game.score >= 60) scoreDisplay = '⭐⭐ ' + scoreDisplay;
+            else scoreDisplay = '⭐ ' + scoreDisplay;
+            
             embed.addFields({
-                name: `${index + 1}. ${game.name}`,
-                value: `⭐ Metacritic: ${game.score}/100\n💰 Price: ${game.price}\n🔗 [View on Steam](https://store.steampowered.com/app/${game.appid})`
+                name: `${medal}${index + 1}. ${game.name}`,
+                value: `⭐ **Metacritic:** ${scoreDisplay}\n🎮 **Platforms:** ${game.platforms || 'Various'}\n💰 **Price:** ${game.price}\n🔗 [View on Steam](https://store.steampowered.com/app/${game.appid})`
             });
         });
-        
-        if (topRatedGames[0]?.header_image) {
-            embed.setThumbnail(topRatedGames[0].header_image);
-        }
         
         return interaction.editReply({ embeds: [embed] });
     } catch (error) {

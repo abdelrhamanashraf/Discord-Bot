@@ -277,7 +277,6 @@ const commands = [
       }
     ]
   },
-  
   {
     name: "anime-season",
     description: "Get anime from a specific year and season",
@@ -330,6 +329,46 @@ const commands = [
       }
     ]
   },
+  {
+    name: "movie-trending",
+    description: "Get trending movies this week"
+  },
+  {
+    name: "series-trending",
+    description: "Get trending TV series this week"
+  },
+  {
+    name: "movie-search",
+    description: "Search for a movie by title",
+    options: [
+      {
+        name: "query",
+        type: 3, // STRING
+        description: "The movie title to search for",
+        required: true
+      }
+    ]
+  },
+  {
+    name: "series-search",
+    description: "Search for a TV series by title",
+    options: [
+      {
+        name: "query",
+        type: 3, // STRING
+        description: "The TV series title to search for",
+        required: true
+      }
+    ]
+  },
+  {
+    name: "movie-random",
+    description: "Get a random movie recommendation"
+  },
+  {
+    name: "movie-trivia",
+    description: "Get a random movie trivia question"
+  }
 ];
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
@@ -569,3 +608,80 @@ client.on("interactionCreate", async (interaction) => {
 
 // Login to Discord with your app's token
 client.login(process.env.DISCORD_TOKEN);
+
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isCommand()) return;
+
+    const command = interaction.commandName;
+    console.log('Received command:', command);
+
+    try {
+        switch (command) {
+            case 'movie-trending':
+                const { handleTrendingMovies } = require('./commands/movies');
+                await handleTrendingMovies(interaction);
+                break;
+
+            case 'series-trending':
+                const { handleTrendingSeries } = require('./commands/movies');
+                await handleTrendingSeries(interaction);
+                break;
+
+            case 'movie-search':
+                const { handleMovieSearch } = require('./commands/movies');
+                await handleMovieSearch(interaction);
+                break;
+
+            case 'series-search':
+                const { handleSeriesSearch } = require('./commands/movies');
+                await handleSeriesSearch(interaction);
+                break;
+
+            case 'movie-random':
+                const { handleRandomMovie } = require('./commands/movies');
+                await handleRandomMovie(interaction);
+                break;
+
+            case 'movie-trivia':
+                const { handleMovieTrivia } = require('./commands/movies');
+                await handleMovieTrivia(interaction);
+                break;
+
+            default:
+                console.log('Command not found in command handler:', command);
+                console.log('Checking switch case for:', command);
+        }
+    } catch (error) {
+        console.error(`Error executing command ${command}:`, error);
+        const errorMessage = 'There was an error executing this command.';
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({ content: errorMessage, ephemeral: true });
+        } else {
+            await interaction.reply({ content: errorMessage, ephemeral: true });
+        }
+    }
+});
+
+// Handle button interactions
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton()) return;
+
+    try {
+        const [baseCommand] = interaction.customId.split('_');
+        
+        if (baseCommand === 'movies' || baseCommand === 'series' || baseCommand === 'movie') {
+            const { handleButton } = require('./commands/movies');
+            await handleButton(interaction);
+        }
+        
+        // ... existing button handlers ...
+    } catch (error) {
+        console.error('Error handling button interaction:', error);
+        const errorMessage = 'There was an error processing this button.';
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({ content: errorMessage, ephemeral: true });
+        } else {
+            await interaction.reply({ content: errorMessage, ephemeral: true });
+        }
+    }
+});

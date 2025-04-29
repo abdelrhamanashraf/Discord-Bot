@@ -41,8 +41,23 @@ const PRAYER_NAMES = {
 };
 
 // Fetch prayer times from API
+// Add prayer times cache
+const prayerTimesCache = new Map();
+
+// Modified fetchPrayerTimes function with caching
 async function fetchPrayerTimes(city, country) {
     try {
+        // Generate cache key using city, country and current date
+        const today = new Date().toDateString();
+        const cacheKey = `${city}_${country}_${today}`;
+        
+        // Check cache first
+        if (prayerTimesCache.has(cacheKey)) {
+            console.log(`Using cached prayer times for ${city}, ${country} on ${today}`);
+            return prayerTimesCache.get(cacheKey);
+        }
+        
+        console.log(`Fetching fresh prayer times for ${city}, ${country}`);
         const response = await axios.get(`http://api.aladhan.com/v1/timingsByCity`, {
             params: {
                 city,
@@ -52,6 +67,19 @@ async function fetchPrayerTimes(city, country) {
         });
         
         if (response.data && response.data.data && response.data.data.timings) {
+            // Cache the results
+            prayerTimesCache.set(cacheKey, response.data.data.timings);
+            
+            // Set cache to expire at the end of the day
+            const midnight = new Date();
+            midnight.setHours(24, 0, 0, 0);
+            const timeUntilMidnight = midnight - new Date();
+            
+            setTimeout(() => {
+                prayerTimesCache.delete(cacheKey);
+                console.log(`Cleared cache for ${city}, ${country} on ${today}`);
+            }, timeUntilMidnight);
+            
             return response.data.data.timings;
         }
         return null;
@@ -184,7 +212,9 @@ async function handlePrayerUnsubscribe(interaction) {
 
 // Check for prayer times and send notifications
 async function checkPrayerTimes(client) {
-    // Check every minute if it's time for prayer notifications
+    const now = new Date();
+    const currentMinute = now.getHours() * 60 + now.getMinutes();
+    
     for (const [userId, subscription] of prayerSubscriptions.entries()) {
         try {
             const timings = await fetchPrayerTimes(subscription.city, subscription.country);

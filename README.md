@@ -1,6 +1,6 @@
 # Discord Bot
 
-A feature-rich Discord bot with various utilities including notes, voting, reminders, prayer times, anime information, Steam game data, and fun commands.
+A feature-rich Discord bot with various utilities including notes, voting, reminders, prayer times, anime information, Steam game data, movies & TV series information, and fun commands.
 
 ## Features
 
@@ -68,6 +68,21 @@ Commands:
 - `/anime-search [query]` - Search for an anime by name
 - `/anime-top [genre]` - Get a list of top-rated anime, optionally filtered by genre
 - `/anime-season [year] [season]` - Get anime from a specific year and season
+
+### 🎥 Movies & TV Series
+- Browse trending movies and TV series
+- Search for movies and TV shows
+- View detailed information and ratings
+- Get random movie recommendations
+- Movie trivia questions
+
+Commands:
+- `/movie-trending` - Get trending movies this week
+- `/series-trending` - Get trending TV series this week
+- `/movie-search [query]` - Search for a movie by title
+- `/series-search [query]` - Search for a TV series by title
+- `/movie-random` - Get a random movie recommendation
+- `/movie-trivia` - Get a random movie trivia question
 
 ### 🎲 Fun Commands
 - Dice rolling

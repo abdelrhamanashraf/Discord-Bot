@@ -5,7 +5,8 @@ const COLORS = {
     NOTE: '#2ECC71',    // Green
     VOTE: '#3498DB',    // Blue
     REMINDER: '#E74C3C', // Red
-    HELP: '#9B59B6'     // Purple
+    HELP: '#9B59B6',    // Purple
+    MOVIE: '#E50914'    // Netflix red
 };
 
 const THUMBNAILS = {
@@ -51,6 +52,11 @@ module.exports = {
                 { 
                     name: '🎬 Anime Information', 
                     value: '```/anime-current\nGet a list of anime from the current season\n\n/anime-search [query]\nSearch for an anime by name\n\n/anime-top [genre]\nGet a list of top-rated anime, optionally filtered by genre\n\n/anime-season [year] [season]\nGet anime from a specific year and season```',
+                    inline: false
+                },
+                {
+                    name: '🎥 Movies & TV Series',
+                    value: '```/movie-trending\nGet trending movies this week\n\n/series-trending\nGet trending TV series this week\n\n/movie-search [query]\nSearch for a movie by title\n\n/series-search [query]\nSearch for a TV series by title\n\n/movie-random\nGet a random movie recommendation\n\n/movie-trivia\nGet a random movie trivia question```',
                     inline: false
                 },
                 { 
