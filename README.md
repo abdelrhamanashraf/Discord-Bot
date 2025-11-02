@@ -1,9 +1,19 @@
 # Discord Bot
 
-
-A feature-rich Discord bot with various utilities including notes, voting, reminders, prayer times, anime information, Steam game data, movies & TV series information, and fun commands.
+A feature-rich Discord bot with AI chat capabilities, utility features, gaming integrations, entertainment information, and fun commands. The bot supports notes, voting, reminders, prayer times, game notifications, anime tracking, movie recommendations, and more.
 
 ## Features
+
+### 🤖 AI Chat
+- Multiple AI models support (Sonar pro, Gemini)
+- Public and private response options
+- Contextual chat history
+- Interactive conversations
+
+Commands:
+- `/chat [message] [model] [private]` - Chat with AI
+  - Available models: Sonar pro, Gemini
+  - Set private:true for private responses
 
 ### 📝 Notes
 - Save and manage personal notes
@@ -58,6 +68,25 @@ Commands:
 - `/steam-search [query]` - Search for a game on Steam
 - `/steam-genre [genre]` - Get top-rated games by genre
 
+### 🎮 Game Notifications
+- Free game alerts
+- Multi-platform support
+- Subscription management
+- Instant notifications
+
+Commands:
+- `/freenotify subscribe` - Subscribe to free game notifications
+- `/freenotify unsubscribe` - Unsubscribe from notifications
+- `/freenotify status` - Check your subscription status
+
+### 🎮 Riot Games
+- Valorant profile statistics
+- League of Legends profile information
+- Multi-region support
+- Detailed player stats
+
+Under Development
+
 ### 🎬 Anime Information
 - Browse current season anime
 - Search for specific anime
@@ -85,7 +114,19 @@ Commands:
 - `/movie-random` - Get a random movie recommendation
 - `/movie-trivia` - Get a random movie trivia question
 
-### 🎲 Fun Commands
+### 🎯 Trivia Game
+- Multiple categories
+- Difficulty levels
+- Score tracking
+- Interactive gameplay
+
+Commands:
+- `/trivia [questions] [category] [difficulty]` - Start a trivia game
+  - Questions: 1-10
+  - Categories: General Knowledge, Books, Film, Music, TV, Games, Science, Computers, Mathematics, Sports, Geography, History, Politics, Art, Animals, Vehicles, Comics, Gadgets, Anime & Manga, Cartoons
+  - Difficulty: Easy, Medium, Hard
+
+### � Fun Commands
 - Dice rolling
 - Random number generation
 - Coin tossing
@@ -107,8 +148,16 @@ Commands:
    ```
 3. Create a `.env` file with:
    ```
+   # Required
    DISCORD_TOKEN=your_bot_token
    ALLOWED_ROLE_ID=your_role_id
+   
+   # API Keys
+   TMDB_API_KEY=your_tmdb_api_key          # For movies & TV features
+   RIOT_API_KEY=your_riot_api_key          # For Riot Games features
+   STEAM_API_KEY=your_steam_api_key        # For Steam features
+   MAL_CLIENT_ID=your_mal_client_id        # For anime features
+   GOOGLE_API_KEY=your_google_api_key      # For AI chat features
    ```
 4. Run the bot:
    ```bash
