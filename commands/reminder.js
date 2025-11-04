@@ -31,7 +31,14 @@ function convertToMs(amount, unit) {
             return null;
     }
 }
-
+const listofimages = [
+'https://cdn.discordapp.com/attachments/1435289217122041937/1435302815323918366/82a736fa-248d-45e6-a8fc-c37992c83786.png?ex=690b7969&is=690a27e9&hm=ea7373d5cecd4daed61f40f32a63347346d79849e997948f428c3a3f52e7ff12&',
+'https://cdn.discordapp.com/attachments/1435289217122041937/1435302815919767745/fff30b7a-b626-4bdf-b78a-1038d3122bf3.png?ex=690b7969&is=690a27e9&hm=bffd4183a3a00eea890da2c5e8647c55d7cb10e26a9e31992591f6e3c13f99d6&'
+];
+const timeIsUp = [
+'https://cdn.discordapp.com/attachments/1435289217122041937/1435289450736259132/Time_is_up1.png?ex=690b6cf7&is=690a1b77&hm=5d88d4c70e22ec8ad196adeb8d491ac24b7b1ad9c53a5d1b2fd5d5348e07a4d6&',
+'https://cdn.discordapp.com/attachments/1435289217122041937/1435304132591358194/Time_is_up2.png?ex=690b7aa3&is=690a2923&hm=8b7ca9d8c93cae826844ca2763020085643a6fe530235589acceeb14d9213915'
+];
 async function handleRemindCommand(interaction) {
     const message = interaction.options.getString('message');
     const amount = interaction.options.getInteger('time');
@@ -62,6 +69,7 @@ async function handleRemindCommand(interaction) {
     const confirmEmbed = new EmbedBuilder()
         .setTitle('⏰ Reminder Set')
         .setDescription(`I'll remind you about: **${message}**`)
+        .setThumbnail(listofimages[Math.floor(Math.random() * listofimages.length)])
         .addFields(
             { name: 'When', value: `${timeString} on ${dateString}`, inline: true },
             { name: 'Time from now', value: `${amount} ${unit}`, inline: true }
@@ -77,6 +85,7 @@ async function handleRemindCommand(interaction) {
             // Create the reminder embed
             const reminderEmbed = new EmbedBuilder()
                 .setTitle('⏰ Reminder!')
+                .setThumbnail(timeIsUp[Math.floor(Math.random() * timeIsUp.length)])
                 .setDescription(`You asked me to remind you about:\n\n**${message}**`)
                 .setColor('#3498DB')
                 .setFooter({ text: `Reminder set ${amount} ${unit} ago` })
