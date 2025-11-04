@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle} = require('discord.js');
 
 // Import the color and thumbnail constants
 const COLORS = {
@@ -85,12 +85,30 @@ module.exports = {
                     inline: false
                 }
             )
-            .setFooter({ 
-                text: `Requested by ${interaction.user.username}`,
+            .setAuthor({
+                name: interaction.user.username,
                 iconURL: interaction.user.displayAvatarURL()
             })
+            .setFooter({
+                text: `
+                Made with ❤️ by Abdelrhman
+                `
+            })
             .setTimestamp();
+            const row = new ActionRowBuilder()
+                        .addComponents(
+                            new ButtonBuilder()
+                                .setLabel('GitHub')
+                                .setStyle(ButtonStyle.Link)
+                                .setURL(`https://github.com/abdelrhamanashraf`)
+                        ).addComponents(
+                            new ButtonBuilder()
+                                .setLabel('linkedIn')
+                                .setStyle(ButtonStyle.Link)
+                                .setURL(`https://www.linkedin.com/in/abdelrahman-ashraf-a10070222/`)
+                        );
+
         
-        await interaction.reply({ embeds: [helpEmbed], ephemeral: true });
+        await interaction.reply({ embeds: [helpEmbed],components: [row],ephemeral: true });
     }
 };
