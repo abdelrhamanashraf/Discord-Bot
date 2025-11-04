@@ -8,6 +8,20 @@ const API_BASE_URL = 'https://api.jikan.moe/v4';
 // Cooldown to avoid rate limiting (Jikan API has a limit of 3 requests per second)
 const apiCooldown = new Map();
 const COOLDOWN_MS = 400; // Wait 400ms between requests
+const earthSeasonIcons = {
+    spring: '🌸',
+    summer: '☀️',
+    fall: '🍂',
+    winter: '❄️'
+};
+const datemonth = new Date().toLocaleDateString('en-CA', { day: 'numeric', month: '2-digit' });
+const seasonIcon = () => {
+if (datemonth >= '03-21' && datemonth <= '06-20') return earthSeasonIcons.spring; // Spring
+if (datemonth >= '06-21' && datemonth <= '09-22') return earthSeasonIcons.summer; // Summer
+if (datemonth >= '09-23' && datemonth <= '12-20') return earthSeasonIcons.fall; // Fall
+return earthSeasonIcons.winter; // Winter
+}
+console.log(`Current Season Icon: ${seasonIcon()}`);
 
 // Cache expiration times
 const CACHE_TIMES = {
@@ -123,7 +137,7 @@ async function handleCurrentSeason(interaction) {
         }
         
         const embed = new EmbedBuilder()
-            .setTitle('🌸 Current Season Anime')
+            .setTitle(`${seasonIcon()}  Current Season Anime`)
             .setColor('#FF6F61')
             .setDescription('Here are the top anime from the current season:')
             .setFooter({ text: 'Data from MyAnimeList via Jikan API' })
@@ -310,7 +324,7 @@ async function handleAnimeBySeason(interaction) {
         }
         
         const embed = new EmbedBuilder()
-            .setTitle(`🍂 ${season.charAt(0).toUpperCase() + season.slice(1)} ${year} Anime`)
+            .setTitle(`${earthSeasonIcons[season]} ${season.charAt(0).toUpperCase() + season.slice(1)} ${year} Anime`)
             .setColor('#FF6F61')
             .setDescription(`Here are the top anime from ${season} ${year}:`)
             .setFooter({ text: 'Data from MyAnimeList via Jikan API' })
