@@ -4,6 +4,14 @@ const path = require('path');
 
 const dataDir = path.join(__dirname, '../data');
 const notesFile = path.join(dataDir, 'notes.json');
+const defaultThumbnail = 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png';
+const imageLIST = [
+'https://cdn.discordapp.com/attachments/1435289217122041937/1435289449708912680/saved2.png?ex=690b6cf7&is=690a1b77&hm=79bb4e6cc0121d310deafe29d062934038fe218caa8cfb62ce0514fc30c82426&',
+'https://cdn.discordapp.com/attachments/1435289217122041937/1435289451667394560/saved1.png?ex=690b6cf7&is=690a1b77&hm=20b527b756c5435d57b76c686f7046a36fe0d768d2a18cab6b6368e907d74608&',
+'https://cdn.discordapp.com/attachments/1435289217122041937/1435289450304372746/saved3.png?ex=690b6cf7&is=690a1b77&hm=4c37438d9c28e5f3eb97904c22218c308af02361bdea0c75969d9e0a787c8c94&',
+];
+// Function to get a random image from the list
+const getRandomImage = () => imageLIST[Math.floor(Math.random() * imageLIST.length)];
 
 // Initialize or load notes
 let notes = {};
@@ -52,14 +60,22 @@ async function handleNoteCommand(interaction) {
             .setTitle('📝 Note Saved')
             .setDescription(`**${title}**\n\n${content}`)
             .setColor('#2ECC71')
-            .setThumbnail('https://cdn-icons-png.flaticon.com/512/2232/2232688.png')
+            .setThumbnail(getRandomImage() || defaultThumbnail)
             .setFooter({ text: `Note created by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
 
         await interaction.channel.send({ embeds: [noteEmbed] });
     }
 
-    await interaction.reply({ content: `Note "${title}" has been saved!`, ephemeral: true });
+    const savinnotes = new EmbedBuilder()
+        .setTitle('📝 Note Saved')
+        .setDescription(`Your note "${title}" has been saved!`)
+        .setColor('#2ECC71')
+        .setThumbnail(getRandomImage() || defaultThumbnail)
+        .setFooter({ text: `Saved by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+        .setTimestamp();
+
+    await interaction.reply({ embeds: [savinnotes], ephemeral: true });
 }
 
 async function handleGetNotesCommand(interaction) {
@@ -81,7 +97,7 @@ async function handleGetNotesCommand(interaction) {
         const embed = new EmbedBuilder()
             .setTitle('📝 Your Notes')
             .setColor('#2ECC71')
-            .setThumbnail('https://cdn-icons-png.flaticon.com/512/2232/2232688.png')
+            .setThumbnail(getRandomImage() || defaultThumbnail)
             .setFooter({ text: `Page ${page + 1}/${pages} • Total Notes: ${userNotes.length}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
 
@@ -150,7 +166,7 @@ async function handleGetNoteCommand(interaction) {
         .setTitle('📝 Note Details')
         .setDescription(`**${note.title}**\n\n${note.content}`)
         .setColor('#2ECC71')
-        .setThumbnail('https://cdn-icons-png.flaticon.com/512/2232/2232688.png')
+        .setThumbnail(getRandomImage() || defaultThumbnail)
         .addFields(
             { name: 'Created At', value: new Date(note.createdAt).toLocaleString(), inline: true },
             { name: 'Author', value: note.author, inline: true }
@@ -340,7 +356,7 @@ async function handleSaveToChannel(interaction, noteId) {
     });
 }
 
-// Implement the missing handleEditNote function based on index1.js
+
 async function handleEditNote(interaction, noteId) {
     const note = notes[noteId];
     if (!note) {
