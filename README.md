@@ -5,7 +5,7 @@ A feature-rich Discord bot with AI chat capabilities, utility features, gaming i
 ## Features
 
 ### 🤖 AI Chat
-- Multiple AI models support (Sonar pro, Gemini)
+- Multiple AI models support (Sonar Pro, Gemini)
 - Public and private response options
 - Contextual chat history
 - Interactive conversations
