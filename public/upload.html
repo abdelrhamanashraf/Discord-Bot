@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload</title>
+    <link rel="shortcut icon" href="https://meowboteow.sirv.com/meow%20images/favicon.ico" type="image/x-icon">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2c2f33;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            /* Prevent scrollbars from stickers */
+            position: relative;
+        }
+
+        .container {
+            background-color: #23272a;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+            z-index: 10;
+            /* Keep form above stickers */
+            position: relative;
+        }
+
+        h1 {
+            margin-bottom: 1.5rem;
+            color: #7289da;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .custom-file-upload {
+            border: 2px dashed #7289da;
+            display: inline-block;
+            padding: 12px 24px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        .custom-file-upload:hover {
+            background-color: rgba(114, 137, 218, 0.1);
+        }
+
+        button {
+            background-color: #7289da;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #5b6eae;
+        }
+
+        button:disabled {
+            background-color: #4f545c;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background-color: #4f545c;
+            border-radius: 4px;
+            margin-top: 1rem;
+            height: 10px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #43b581;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Sticker Styles */
+        .sticker {
+            position: absolute;
+            z-index: 1;
+            opacity: 0.8;
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+            transition: transform 0.3s ease;
+            pointer-events: none;
+            /* Let clicks pass through */
+        }
+
+        /* Individual Sticker Positions */
+        .sticker-1 {
+            top: 5%;
+            left: 5%;
+            width: 120px;
+            transform: rotate(-15deg);
+        }
+
+        .sticker-2 {
+            top: 10%;
+            right: 10%;
+            width: 110px;
+            transform: rotate(10deg);
+        }
+
+        .sticker-3 {
+            bottom: 5%;
+            left: 10%;
+            width: 130px;
+            transform: rotate(5deg);
+        }
+
+        .sticker-4 {
+            bottom: 10%;
+            right: 5%;
+            width: 120px;
+            transform: rotate(-10deg);
+        }
+
+        .sticker-5 {
+            top: 45%;
+            left: 2%;
+            width: 100px;
+            transform: rotate(-20deg);
+        }
+
+        .sticker-6 {
+            top: 50%;
+            right: 2%;
+            width: 140px;
+            transform: rotate(20deg);
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .sticker {
+                opacity: 0.3;
+            }
+
+            /* Fade them out on mobile to not distract */
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Stickers -->
+    <img src="/images/doren.webp" class="sticker sticker-1" alt="sticker">
+    <img src="/images/farmer.webp" class="sticker sticker-2" alt="sticker">
+    <img src="/images/miner.webp" class="sticker sticker-3" alt="sticker">
+    <img src="/images/soilder.webp" class="sticker sticker-4" alt="sticker">
+    <img src="/images/wizzard.webp" class="sticker sticker-5" alt="sticker">
+    <img src="/images/zombie.webp" class="sticker sticker-6" alt="sticker">
+
+    <div class="container">
+        <h1>Upload File</h1>
+        <p id="provider-display">Provider: Loading...</p>
+
+        <label for="file-upload" class="custom-file-upload">
+            Select File
+        </label>
+        <input id="file-upload" type="file" />
+        <div id="file-name">No file selected</div>
+
+        <div class="progress-bar" id="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+
+        <br>
+        <button id="upload-btn" disabled>Upload</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('id');
+        const provider = urlParams.get('provider');
+
+        document.getElementById('provider-display').innerText = `Provider: ${provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Unknown'}`;
+
+        const fileInput = document.getElementById('file-upload');
+        const fileNameDisplay = document.getElementById('file-name');
+        const uploadBtn = document.getElementById('upload-btn');
+        const statusDiv = document.getElementById('status');
+        const progressBar = document.getElementById('progress-bar');
+        const progressFill = document.getElementById('progress-fill');
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                fileNameDisplay.innerText = fileInput.files[0].name;
+                uploadBtn.disabled = false;
+            } else {
+                fileNameDisplay.innerText = 'No file selected';
+                uploadBtn.disabled = true;
+            }
+        });
+
+        uploadBtn.addEventListener('click', async () => {
+            if (!fileInput.files.length) return;
+
+            const file = fileInput.files[0];
+            uploadBtn.disabled = true;
+            statusDiv.innerText = 'Starting upload...';
+            progressBar.style.display = 'block';
+            progressFill.style.width = '0%';
+
+            try {
+                let downloadUrl = '';
+
+                if (provider === 'gofile') {
+                    statusDiv.innerText = 'Getting Gofile servers...';
+                    const serverRes = await fetch('/api/proxy/gofile/servers');
+                    const serverData = await serverRes.json();
+
+                    if (serverData.status !== 'ok') throw new Error('Failed to get Gofile servers');
+
+                    // Pick the first available server
+                    const servers = serverData.data.servers;
+                    if (!servers || servers.length === 0) throw new Error('No Gofile servers available');
+
+                    const server = servers[0].name;
+                    statusDiv.innerText = `Uploading to ${server}...`;
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const uploadRes = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', `https://${server}.gofile.io/uploadFile`);
+
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const percent = (e.loaded / e.total) * 100;
+                                progressFill.style.width = `${percent}%`;
+                            }
+                        };
+
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                resolve(JSON.parse(xhr.responseText));
+                            } else {
+                                reject(new Error('Upload failed'));
+                            }
+                        };
+
+                        xhr.onerror = () => reject(new Error('Network error'));
+                        xhr.send(formData);
+                    });
+
+                    if (uploadRes.status !== 'ok') throw new Error('Gofile upload failed');
+                    downloadUrl = uploadRes.data.downloadPage;
+
+                } else if (provider === 'vikingfile') {
+                    statusDiv.innerText = 'Getting Vikingfile server...';
+                    const serverRes = await fetch('/api/proxy/vikingfile/server');
+                    const serverData = await serverRes.json();
+
+                    if (!serverData.server) throw new Error('Failed to get Vikingfile server');
+
+                    const uploadUrl = serverData.server;
+                    statusDiv.innerText = 'Uploading to Vikingfile...';
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const uploadRes = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', uploadUrl);
+
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const percent = (e.loaded / e.total) * 100;
+                                progressFill.style.width = `${percent}%`;
+                            }
+                        };
+
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                resolve(JSON.parse(xhr.responseText));
+                            } else {
+                                reject(new Error('Upload failed'));
+                            }
+                        };
+
+                        xhr.onerror = () => reject(new Error('Network error'));
+                        xhr.send(formData);
+                    });
+
+                    if (uploadRes.files && uploadRes.files.length > 0) {
+                        downloadUrl = uploadRes.files[0].url;
+                    } else {
+                        console.log('Vikingfile upload response:', uploadRes);
+                        if (uploadRes.url) downloadUrl = uploadRes.url;
+                        else throw new Error('Could not parse Vikingfile response');
+                    }
+                } else if (provider === 'ddownload') {
+                    statusDiv.innerText = 'Getting DDownload server...';
+                    const serverRes = await fetch('/api/proxy/ddownload/server');
+                    const serverData = await serverRes.json();
+
+                    if (!serverData.uploadUrl) throw new Error('Failed to get DDownload server');
+
+                    const uploadUrl = serverData.uploadUrl;
+                    const sessId = serverData.sess_id;
+                    statusDiv.innerText = 'Uploading to DDownload...';
+
+                    const formData = new FormData();
+                    formData.append('sess_id', sessId);
+                    formData.append('file', file);
+
+                    const uploadRes = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', uploadUrl);
+
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const percent = (e.loaded / e.total) * 100;
+                                progressFill.style.width = `${percent}%`;
+                            }
+                        };
+
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                resolve(JSON.parse(xhr.responseText));
+                            } else {
+                                reject(new Error('Upload failed'));
+                            }
+                        };
+
+                        xhr.onerror = () => reject(new Error('Network error'));
+                        xhr.send(formData);
+                    });
+
+                    if (Array.isArray(uploadRes) && uploadRes.length > 0) {
+                        downloadUrl = `https://ddownload.com/${uploadRes[0].file_code}`;
+                    } else if (uploadRes.files && uploadRes.files.length > 0) {
+                        downloadUrl = `https://ddownload.com/${uploadRes.files[0].file_code}`;
+                    } else {
+                        console.log('DDownload response:', uploadRes);
+                        throw new Error('Could not parse DDownload response');
+                    }
+
+                } else if (provider === 'fileq') {
+                    statusDiv.innerText = 'Getting Fileq server...';
+                    const serverRes = await fetch('/api/proxy/fileq/server');
+                    const serverData = await serverRes.json();
+
+                    if (!serverData.uploadUrl) throw new Error('Failed to get Fileq server');
+
+                    const uploadUrl = serverData.uploadUrl;
+                    const sessId = serverData.sess_id;
+                    statusDiv.innerText = 'Uploading to Fileq...';
+
+                    const formData = new FormData();
+                    formData.append('sess_id', sessId);
+                    formData.append('file_0', file);
+
+                    const uploadRes = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        // Proxy the upload through our server to bypass CORS/SSL issues
+                        const proxyUrl = `/api/proxy/upload?target=${encodeURIComponent(uploadUrl)}`;
+                        xhr.open('POST', proxyUrl);
+
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const percent = (e.loaded / e.total) * 100;
+                                progressFill.style.width = `${percent}%`;
+                            }
+                        };
+
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                resolve(JSON.parse(xhr.responseText));
+                            } else {
+                                reject(new Error('Upload failed'));
+                            }
+                        };
+
+                        xhr.onerror = () => reject(new Error('Network error'));
+                        xhr.send(formData);
+                    });
+
+                    if (Array.isArray(uploadRes) && uploadRes.length > 0) {
+                        downloadUrl = `https://fileq.net/${uploadRes[0].file_code}`;
+                    } else if (uploadRes.files && uploadRes.files.length > 0) {
+                        downloadUrl = `https://fileq.net/${uploadRes.files[0].file_code}`;
+                    } else {
+                        console.log('Fileq response:', uploadRes);
+                        throw new Error('Could not parse Fileq response');
+                    }
+
+                } else if (provider === 'datavaults') {
+                    statusDiv.innerText = 'Getting DataVaults server...';
+                    const serverRes = await fetch('/api/proxy/datavaults/server');
+                    const serverData = await serverRes.json();
+
+                    if (!serverData.uploadUrl) throw new Error('Failed to get DataVaults server');
+
+                    const uploadUrl = serverData.uploadUrl;
+                    const sessId = serverData.sess_id;
+                    statusDiv.innerText = 'Uploading to DataVaults...';
+
+                    const formData = new FormData();
+                    formData.append('sess_id', sessId);
+                    formData.append('file_0', file);
+
+                    const uploadRes = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        // Proxy the upload through our server
+                        const proxyUrl = `/api/proxy/upload?target=${encodeURIComponent(uploadUrl)}`;
+                        xhr.open('POST', proxyUrl);
+
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const percent = (e.loaded / e.total) * 100;
+                                progressFill.style.width = `${percent}%`;
+                            }
+                        };
+
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                resolve(JSON.parse(xhr.responseText));
+                            } else {
+                                reject(new Error('Upload failed'));
+                            }
+                        };
+
+                        xhr.onerror = () => reject(new Error('Network error'));
+                        xhr.send(formData);
+                    });
+
+                    if (Array.isArray(uploadRes) && uploadRes.length > 0) {
+                        downloadUrl = `https://datavaults.co/${uploadRes[0].file_code}`;
+                    } else if (uploadRes.files && uploadRes.files.length > 0) {
+                        downloadUrl = `https://datavaults.co/${uploadRes.files[0].file_code}`;
+                    } else {
+                        console.log('DataVaults response:', uploadRes);
+                        throw new Error('Could not parse DataVaults response');
+                    }
+                } else if (provider === 'rootz') {
+                    statusDiv.innerText = 'Initializing Rootz upload...';
+
+                    const MULTIPART_THRESHOLD = 5 * 1024 * 1024; // 5MB
+
+                    if (file.size < MULTIPART_THRESHOLD) {
+                        // --- Small File Upload (< 5MB) ---
+                        statusDiv.innerText = 'Uploading small file to Rootz...';
+                        const formData = new FormData();
+                        formData.append('file', file);
+
+                        const uploadRes = await fetch('/api/proxy/rootz/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!uploadRes.ok) throw new Error('Rootz upload failed');
+                        const result = await uploadRes.json();
+
+                        if (!result.success) throw new Error(result.error || 'Rootz upload error');
+
+                        // result.data should look like { shortId, ... } based on user docs
+                        downloadUrl = `https://www.rootz.so/d/${result.data.shortId}`;
+
+                    } else {
+                        // --- Large File Upload (Multipart) ---
+                        statusDiv.innerText = 'Starting multipart upload...';
+
+                        // 1. Init
+                        const initRes = await fetch('/api/proxy/rootz/multipart/init', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                fileName: file.name,
+                                fileSize: file.size,
+                                fileType: file.type
+                            })
+                        });
+                        const initData = await initRes.json();
+                        const { uploadId, key, chunkSize, totalParts } = initData;
+
+                        // 2. Get Presigned URLs
+                        statusDiv.innerText = `Getting URLs for ${totalParts} parts...`;
+                        const urlsRes = await fetch('/api/proxy/rootz/multipart/batch-urls', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key, uploadId, totalParts })
+                        });
+                        const urlsData = await urlsRes.json();
+                        if (!urlsData.success) throw new Error(urlsData.error);
+                        const urls = urlsData.urls;
+
+                        // 3. Upload Parts
+                        let uploadedBytes = 0;
+                        const uploadedParts = [];
+                        const PARALLEL_UPLOADS = 3;
+
+                        const uploadPart = async (partNumber) => {
+                            const start = (partNumber - 1) * chunkSize;
+                            const end = Math.min(start + chunkSize, file.size);
+                            const chunk = file.slice(start, end);
+
+                            const res = await fetch(urls[partNumber], { method: 'PUT', body: chunk });
+                            if (!res.ok) throw new Error(`Part ${partNumber} failed`);
+
+                            let etag = res.headers.get('ETag');
+                            if (etag) etag = etag.replace(/"/g, '');
+
+                            uploadedBytes += chunk.size;
+                            const percent = (uploadedBytes / file.size) * 100;
+                            progressFill.style.width = `${percent}%`;
+                            statusDiv.innerText = `Uploading parts: ${Math.round(percent)}%`;
+
+                            return { partNumber, etag };
+                        };
+
+                        // Process in batches
+                        for (let i = 0; i < totalParts; i += PARALLEL_UPLOADS) {
+                            const batch = [];
+                            for (let j = i; j < Math.min(i + PARALLEL_UPLOADS, totalParts); j++) {
+                                batch.push(uploadPart(j + 1));
+                            }
+                            const results = await Promise.all(batch);
+                            uploadedParts.push(...results);
+                        }
+
+                        // 4. Complete
+                        statusDiv.innerText = 'Finalizing upload...';
+                        const completeRes = await fetch('/api/proxy/rootz/multipart/complete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                key, uploadId, parts: uploadedParts,
+                                fileName: file.name, fileSize: file.size, contentType: file.type
+                            })
+                        });
+                        const completeData = await completeRes.json();
+                        if (!completeData.success) throw new Error(completeData.error);
+
+                        // Complete returns 'file' object, not 'data'
+                        downloadUrl = `https://www.rootz.so/d/${completeData.file.shortId}`;
+                    }
+
+                } else if (provider === 'pixeldrain') {
+                    statusDiv.innerText = 'Uploading to Pixeldrain...';
+
+                    const uploadRes = await fetch(`/api/proxy/pixeldrain/upload/${encodeURIComponent(file.name)}`, {
+                        method: 'PUT',
+                        body: file
+                    });
+
+                    if (!uploadRes.ok) throw new Error('Pixeldrain upload failed');
+                    const result = await uploadRes.json();
+
+                    if (result.id) {
+                        downloadUrl = `https://pixeldrain.com/u/${result.id}`;
+                    } else {
+                        throw new Error(result.message || 'Pixeldrain upload failed');
+                    }
+                }
+                else {
+                    throw new Error('Unknown provider');
+                }
+
+                statusDiv.innerText = 'Upload complete! Notifying bot...';
+
+                // Notify backend
+                const callbackRes = await fetch('/api/callback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: sessionId,
+                        fileUrl: downloadUrl,
+                        fileName: file.name
+                    })
+                });
+
+                if (callbackRes.ok) {
+                    statusDiv.innerText = 'Success! You can close this window.';
+                    statusDiv.style.color = '#43b581';
+                } else {
+                    throw new Error('Failed to notify bot');
+                }
+
+            } catch (error) {
+                console.error(error);
+                statusDiv.innerText = `Error: ${error.message}`;
+                statusDiv.style.color = '#f04747';
+                uploadBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

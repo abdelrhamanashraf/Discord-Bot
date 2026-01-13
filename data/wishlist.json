@@ -1,0 +1,93 @@
+{
+  "525297784342052884": {
+    "movies": [
+      {
+        "id": 1924,
+        "title": "Superman",
+        "poster_path": "/d7px1FQxW4tngdACVRsCSaZq0Xl.jpg",
+        "vote_average": 7.2,
+        "release_date": "1978-12-14",
+        "added_at": "2025-11-28T17:15:48.420Z"
+      },
+      {
+        "id": 268,
+        "title": "Batman",
+        "poster_path": "/cij4dd21v2Rk2YtUQbV5kW69WB2.jpg",
+        "vote_average": 7.2,
+        "release_date": "1989-06-21",
+        "added_at": "2025-11-28T17:39:12.742Z"
+      }
+    ],
+    "series": [
+      {
+        "id": 1396,
+        "title": "Breaking Bad",
+        "poster_path": "/ztkUQFLlC19CCMYHW9o1zWhJRNq.jpg",
+        "vote_average": 8.936,
+        "release_date": "2008-01-20",
+        "added_at": "2025-11-28T17:20:08.312Z"
+      },
+      {
+        "id": 66732,
+        "title": "Stranger Things",
+        "poster_path": "/cVxVGwHce6xnW8UaVUggaPXbmoE.jpg",
+        "vote_average": 8.6,
+        "release_date": "2016-07-15",
+        "added_at": "2025-11-28T17:32:30.952Z"
+      }
+    ],
+    "anime": [
+      {
+        "id": 52991,
+        "added_at": "2025-11-28T18:20:54.337Z",
+        "title": "Sousou no Frieren",
+        "poster_path": "https://cdn.myanimelist.net/images/anime/1015/138006l.jpg",
+        "vote_average": 9.29,
+        "release_date": "2023-09-29"
+      },
+      {
+        "id": 16870,
+        "added_at": "2025-11-28T18:21:36.402Z",
+        "title": "The Last: Naruto the Movie",
+        "poster_path": "https://cdn.myanimelist.net/images/anime/1491/134498l.jpg",
+        "vote_average": 7.79,
+        "release_date": "2014-12-06"
+      },
+      {
+        "id": 20,
+        "added_at": "2025-12-11T19:47:55.307Z",
+        "title": "Naruto",
+        "poster_path": "https://cdn.myanimelist.net/images/anime/1141/142503l.jpg",
+        "vote_average": 8.02,
+        "release_date": "2002-10-03"
+      }
+    ],
+    "books": [
+      {
+        "added_at": "2025-11-28T18:45:17.494Z",
+        "title": "Harry Potter and the Order of the Phoenix",
+        "poster_path": "https://covers.openlibrary.org/b/id/10523466-L.jpg",
+        "vote_average": null,
+        "release_date": "2003"
+      },
+      {
+        "id": "/works/OL38259980W",
+        "added_at": "2025-12-05T08:55:44.585Z",
+        "title": "Summary of Quiet by Susan Cain",
+        "poster_path": null,
+        "vote_average": null,
+        "release_date": "N/A"
+      }
+    ],
+    "games": [
+      {
+        "id": "1217060",
+        "added_at": "2025-11-28T19:18:44.386Z",
+        "title": "Gunfire Reborn",
+        "poster_path": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1217060/dd6c1906d262c38c183ccd711f192db187b5103f/header.jpg?t=1763455761",
+        "vote_average": "$10.49 USD",
+        "release_date": null
+      }
+    ]
+  }
+}
