@@ -144,62 +144,7 @@ async function generateMatchImage(match, participant) {
     infoX += 100;
     ctx.fillText(`Mode: ${match.info.tft_set_core_name || 'Standard'}`, infoX, 110);
 
-    // --- 3. Hextech Augments ---
-    // Draw them at the top right
-    if (participant.augments && participant.augments.length > 0) {
-        let augX = width - 50 - (participant.augments.length * 70);
-        const augY = 40;
-        const augSize = 60;
-
-        ctx.fillStyle = '#b0b0b0';
-        ctx.textAlign = 'right';
-        ctx.fillText('Augments:', augX - 15, augY + 38);
-        ctx.textAlign = 'left';
-
-        for (const aug of participant.augments) {
-            // aug is ID like "TFT9_Augment_..."
-            // Try DDragon First
-            let imageUrls = [];
-
-            if (ASSET_CACHE.augments[aug]) {
-                imageUrls.push(`https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VER}/img/tft-augment/${ASSET_CACHE.augments[aug].full}`);
-            }
-            imageUrls.push(`https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VER}/img/tft-augment/${aug}.png`);
-
-            // Fallback: Community Dragon (Generic guess)
-            // https://raw.communitydragon.org/latest/game/assets/ux/tft/augments/icons/
-            imageUrls.push(`https://raw.communitydragon.org/latest/game/assets/ux/tft/augments/icons/${aug.toLowerCase()}.png`);
-            imageUrls.push(`https://raw.communitydragon.org/latest/game/assets/maps/tft/icons/augments/hexcore/${aug.toLowerCase()}.png`);
-
-            let imageLoaded = false;
-            for (const url of imageUrls) {
-                try {
-                    const img = await Canvas.loadImage(url);
-                    ctx.drawImage(img, augX, augY, augSize, augSize);
-                    imageLoaded = true;
-                    break;
-                } catch (e) { }
-            }
-
-            if (!imageLoaded) {
-                // Fallback Box (Visible)
-                ctx.fillStyle = '#444';
-                ctx.strokeStyle = '#888';
-                ctx.lineWidth = 2;
-                ctx.fillRect(augX, augY, augSize, augSize);
-                ctx.strokeRect(augX, augY, augSize, augSize);
-
-                ctx.fillStyle = '#fff';
-                ctx.font = '10px Sans';
-                ctx.textAlign = 'center';
-                // Show short ID
-                const shortId = aug.split('_').pop().substring(0, 6);
-                ctx.fillText(shortId, augX + augSize / 2, augY + augSize / 2 + 4);
-                ctx.textAlign = 'left';
-            }
-            augX += augSize + 10;
-        }
-    }
+    // NOTE: Hextech Augments section removed - Riot API no longer provides augment data (as of Nov 2024)
 
     ctx.shadowBlur = 0;
 
@@ -253,9 +198,10 @@ async function generateMatchImage(match, participant) {
             '#11b288', // 1 - Green
             '#0077ff', // 2 - Blue
             '#c440da', // 3 - Purple
-            '#ffb93b', // 4 - Gold
+            '#c440da', // 4 - Gold
             '#ffb93b', // 5 - Gold
-            '#ffb93b'  // 6 - Gold
+            '#ffb93b', // 6 - Gold
+            '#ffb93b'  // 7 - Gold
         ];
 
         ctx.strokeStyle = rarityColors[unit.rarity] || '#fff';
@@ -402,7 +348,7 @@ module.exports = {
 
         const summonerName = interaction.options.getString('summoner');
         const tagLine = interaction.options.getString('tag');
-        const apiKey = process.env.TFT_API_KEY || process.env.RIOT_API_KEY || interaction.options.getString('apikey');
+        const apiKey = process.env.TFT_API_KEY || process.env.RIOT_API_KEY;
         const region = interaction.options.getString('region');
 
         if (!apiKey) {

@@ -663,6 +663,25 @@ async function handleWhatsAppDisconnect(interaction) {
     }
 }
 
+// Helper function to send message with retry logic
+async function sendMessageWithRetry(formattedNumber, content, options = {}, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            // Add sendSeen: false to prevent the markedUnread error
+            const sendOptions = { ...options, sendSeen: false };
+            return await whatsappClient.sendMessage(formattedNumber, content, sendOptions);
+        } catch (error) {
+            console.log(`[WhatsApp] Send attempt ${attempt}/${maxRetries} failed:`, error.message);
+            if (attempt < maxRetries) {
+                // Wait before retrying (exponential backoff: 1s, 2s, 3s)
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            } else {
+                throw error;
+            }
+        }
+    }
+}
+
 // Send WhatsApp message
 async function sendWhatsAppMessage(phoneNumber, message, contactName = '', channelId = '') {
     if (!isWhatsAppReady || !whatsappClient) {
@@ -671,6 +690,20 @@ async function sendWhatsAppMessage(phoneNumber, message, contactName = '', chann
 
     const formattedNumber = formatPhoneNumber(phoneNumber);
     let sentMessage;
+
+    // Validate the number is registered on WhatsApp before sending
+    try {
+        const isRegistered = await whatsappClient.isRegisteredUser(formattedNumber);
+        if (!isRegistered) {
+            throw new Error(`The number ${phoneNumber} is not registered on WhatsApp`);
+        }
+    } catch (validationError) {
+        // If validation fails, log but continue (might be a temporary issue)
+        console.log(`[WhatsApp] Number validation warning:`, validationError.message);
+    }
+
+    // Small delay to ensure chat is ready
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Check if message contains keyword to send with image
     const keywords = ['summon', 'come']; // Add more keywords here if needed
@@ -691,17 +724,17 @@ async function sendWhatsAppMessage(phoneNumber, message, contactName = '', chann
         try {
             // Download and send image as media
             const media = await MessageMedia.fromUrl(imageUrl);
-            // Send message with image
-            sentMessage = await whatsappClient.sendMessage(formattedNumber, media, { caption: message });
+            // Send message with image using retry logic
+            sentMessage = await sendMessageWithRetry(formattedNumber, media, { caption: message });
             console.log(`[WhatsApp] 📷 Sent message with image to ${contactName || phoneNumber}`);
         } catch (error) {
             console.error(`[WhatsApp] Error sending image, sending text only:`, error);
             // Fallback to text message if image fails
-            sentMessage = await whatsappClient.sendMessage(formattedNumber, message);
+            sentMessage = await sendMessageWithRetry(formattedNumber, message);
         }
     } else {
-        // Send regular text message
-        sentMessage = await whatsappClient.sendMessage(formattedNumber, message);
+        // Send regular text message with retry logic
+        sentMessage = await sendMessageWithRetry(formattedNumber, message);
     }
 
     // Add to pending messages for monitoring replies (if channelId provided)

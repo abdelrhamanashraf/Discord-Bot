@@ -678,12 +678,6 @@ const commands = [
         required: true
       },
       {
-        name: "apikey",
-        type: 3, // STRING
-        description: "Your Development API Key (RGAPI-...)",
-        required: false
-      },
-      {
         name: "region",
         type: 3, // STRING
         description: "Region",
