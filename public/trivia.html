@@ -1,0 +1,1825 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeowBot Trivia</title>
+    <link rel="shortcut icon" href="https://meowboteow.sirv.com/meow%20images/favicon.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f0e17;
+            --bg-secondary: #1a1926;
+            --bg-card: rgba(30, 28, 50, 0.7);
+            --bg-glass: rgba(255, 255, 255, 0.04);
+            --accent: #7C3AED;
+            --accent-light: #a78bfa;
+            --accent-glow: rgba(124, 58, 237, 0.3);
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text-primary: #f0eef6;
+            --text-secondary: #8b8a95;
+            --text-muted: #5a5969;
+            --border: rgba(255, 255, 255, 0.06);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Background effects */
+        .bg-effects {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-effects .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.15;
+        }
+
+        .bg-effects .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: #7C3AED;
+            top: -10%;
+            left: -10%;
+            animation: float1 20s ease-in-out infinite;
+        }
+
+        .bg-effects .orb-2 {
+            width: 400px;
+            height: 400px;
+            background: #3b82f6;
+            bottom: -10%;
+            right: -10%;
+            animation: float2 25s ease-in-out infinite;
+        }
+
+        .bg-effects .orb-3 {
+            width: 300px;
+            height: 300px;
+            background: #ec4899;
+            top: 50%;
+            left: 50%;
+            animation: float3 18s ease-in-out infinite;
+        }
+
+        @keyframes float1 {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(80px, 60px);
+            }
+        }
+
+        @keyframes float2 {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(-60px, -80px);
+            }
+        }
+
+        @keyframes float3 {
+
+            0%,
+            100% {
+                transform: translate(-50%, -50%);
+            }
+
+            50% {
+                transform: translate(-30%, -70%);
+            }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 24px 0 16px;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #a78bfa, #7C3AED, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        /* Phase containers */
+        .phase {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .phase.active {
+            display: flex;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            backdrop-filter: blur(20px);
+        }
+
+        .card-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-light);
+            margin-bottom: 16px;
+        }
+
+        /* Player cards */
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .player-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .player-card.host {
+            border-color: var(--accent);
+            background: rgba(124, 58, 237, 0.08);
+        }
+
+        .player-card.disconnected {
+            opacity: 0.4;
+        }
+
+        .player-card .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border);
+        }
+
+        .player-card.host .avatar {
+            border-color: var(--accent);
+        }
+
+        .player-card .info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .player-card .name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-card .tag {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .player-card .host-badge {
+            font-size: 0.6rem;
+            background: var(--accent);
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        /* Config form */
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 14px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group select,
+        .form-group input {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            border-color: var(--accent);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 28px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: all 0.25s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7C3AED, #6d28d9);
+            color: #fff;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(124, 58, 237, 0.5);
+        }
+
+        .btn-secondary {
+            background: var(--bg-glass);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Share link */
+        .share-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 8px 12px;
+            margin-top: 8px;
+        }
+
+        .share-box input {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font);
+            font-size: 0.8rem;
+            outline: none;
+        }
+
+        .share-box .copy-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: var(--font);
+            font-weight: 600;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .share-box .copy-btn:hover {
+            background: #6d28d9;
+        }
+
+        /* ======= GAME PHASE ======= */
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 20px;
+            flex: 1;
+        }
+
+        /* Question area */
+        .question-card {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .question-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .question-meta .progress {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .question-meta .badge {
+            font-size: 0.7rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .badge-category {
+            background: rgba(124, 58, 237, 0.15);
+            color: var(--accent-light);
+        }
+
+        .badge-easy {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+        }
+
+        .badge-medium {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
+
+        .badge-hard {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            font-weight: 700;
+            line-height: 1.5;
+            padding: 8px 0;
+        }
+
+        /* Timer bar */
+        .timer-bar-container {
+            height: 6px;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .timer-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #ec4899);
+            border-radius: 3px;
+            transition: width 0.1s linear;
+            width: 100%;
+        }
+
+        .timer-bar.warning {
+            background: linear-gradient(90deg, var(--warning), var(--danger));
+        }
+
+        /* Answer buttons */
+        .answers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .answer-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-glass);
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: var(--font);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-align: left;
+        }
+
+        .answer-btn:hover:not(:disabled):not(.selected):not(.correct):not(.incorrect) {
+            border-color: var(--accent);
+            background: rgba(124, 58, 237, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .answer-btn:disabled {
+            cursor: default;
+        }
+
+        .answer-btn .letter {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            background: rgba(124, 58, 237, 0.15);
+            color: var(--accent-light);
+        }
+
+        .answer-btn.selected {
+            border-color: var(--accent);
+            background: rgba(124, 58, 237, 0.12);
+        }
+
+        .answer-btn.correct {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.12);
+            animation: correctPulse 0.5s ease;
+        }
+
+        .answer-btn.correct .letter {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .answer-btn.incorrect {
+            border-color: var(--danger);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .answer-btn.incorrect .letter {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        @keyframes correctPulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* Sidebar scoreboard */
+        .scoreboard {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .score-entry {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .score-entry.answered {
+            border-left: 3px solid var(--accent);
+        }
+
+        .score-entry .rank {
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            width: 20px;
+            text-align: center;
+        }
+
+        .score-entry:nth-child(1) .rank {
+            color: #fbbf24;
+        }
+
+        .score-entry:nth-child(2) .rank {
+            color: #94a3b8;
+        }
+
+        .score-entry:nth-child(3) .rank {
+            color: #cd7f32;
+        }
+
+        .score-entry .avatar-sm {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .score-entry .score-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .score-entry .score-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .score-entry .score-pts {
+            font-size: 0.75rem;
+            color: var(--accent-light);
+            font-weight: 700;
+        }
+
+        .score-entry .check-mark {
+            color: var(--success);
+            font-size: 0.85rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .score-entry.answered .check-mark {
+            opacity: 1;
+        }
+
+        /* ======= RESULTS PHASE ======= */
+        .results-podium {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 16px;
+            padding: 20px 0;
+        }
+
+        .podium-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 20px 16px;
+            border-radius: var(--radius);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            min-width: 120px;
+            transition: all 0.5s ease;
+        }
+
+        .podium-card.first {
+            border-color: #fbbf24;
+            background: linear-gradient(180deg, rgba(251, 191, 36, 0.08), transparent);
+            transform: translateY(-16px);
+        }
+
+        .podium-card.second {
+            border-color: #94a3b8;
+            background: linear-gradient(180deg, rgba(148, 163, 184, 0.06), transparent);
+        }
+
+        .podium-card.third {
+            border-color: #cd7f32;
+            background: linear-gradient(180deg, rgba(205, 127, 50, 0.06), transparent);
+        }
+
+        .podium-card .trophy {
+            font-size: 1.5rem;
+        }
+
+        .podium-card .avatar-lg {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--border);
+        }
+
+        .podium-card.first .avatar-lg {
+            border-color: #fbbf24;
+        }
+
+        .podium-card.second .avatar-lg {
+            border-color: #94a3b8;
+        }
+
+        .podium-card.third .avatar-lg {
+            border-color: #cd7f32;
+        }
+
+        .podium-card .podium-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .podium-card .podium-score {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--accent-light);
+        }
+
+        .podium-card .podium-accuracy {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .results-breakdown {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .results-breakdown::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .results-breakdown::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 2px;
+        }
+
+        .breakdown-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .breakdown-row:last-child {
+            border-bottom: none;
+        }
+
+        .breakdown-row .rank-num {
+            font-weight: 700;
+            color: var(--text-muted);
+            width: 24px;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .breakdown-row .bd-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .breakdown-row .bd-name {
+            flex: 1;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .breakdown-row .bd-stats {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        /* Error/Loading */
+        .status-msg {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .status-msg .icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .status-msg h2 {
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            font-size: 0.85rem;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+            max-width: 320px;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        /* Countdown overlay */
+        .countdown-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(15, 14, 23, 0.9);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .countdown-overlay.active {
+            display: flex;
+        }
+
+        .countdown-number {
+            font-size: 8rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #a78bfa, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: countBounce 1s ease;
+        }
+
+        .countdown-text {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-top: 16px;
+            text-align: center;
+        }
+
+        @keyframes countBounce {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Cat decorations */
+        .cat-deco {
+            position: fixed;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.12;
+            filter: drop-shadow(0 0 20px rgba(124, 58, 237, 0.3));
+            transition: opacity 0.5s;
+        }
+
+        .cat-deco:hover {
+            opacity: 0.25;
+            pointer-events: auto;
+        }
+
+        .cat-deco-tl {
+            top: 10px;
+            left: 10px;
+            width: 100px;
+            animation: catFloat 6s ease-in-out infinite;
+        }
+
+        .cat-deco-br {
+            bottom: 10px;
+            right: 10px;
+            width: 90px;
+            animation: catFloat 8s ease-in-out infinite reverse;
+        }
+
+        .cat-deco-bl {
+            bottom: 80px;
+            left: 20px;
+            width: 70px;
+            animation: catFloat 7s ease-in-out infinite 1s;
+        }
+
+        .cat-deco-tr {
+            top: 80px;
+            right: 20px;
+            width: 80px;
+            animation: catFloat 9s ease-in-out infinite 2s;
+        }
+
+        @keyframes catFloat {
+
+            0%,
+            100% {
+                transform: translateY(0) rotate(0deg);
+            }
+
+            25% {
+                transform: translateY(-8px) rotate(2deg);
+            }
+
+            75% {
+                transform: translateY(6px) rotate(-2deg);
+            }
+        }
+
+        /* Header mascot */
+        .header-mascot {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            margin: 0 auto 8px;
+            display: block;
+            border: 3px solid var(--accent);
+            box-shadow: 0 0 30px var(--accent-glow);
+            animation: mascotPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes mascotPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 20px var(--accent-glow);
+            }
+
+            50% {
+                box-shadow: 0 0 40px rgba(124, 58, 237, 0.5);
+            }
+        }
+
+        /* Config grid 4 columns for Type */
+        .config-grid {
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .config-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .answers-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .results-podium {
+                flex-wrap: wrap;
+            }
+
+            .question-text {
+                font-size: 1rem;
+            }
+
+            .cat-deco {
+                display: none;
+            }
+
+            .header-mascot {
+                width: 56px;
+                height: 56px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Cat decorations -->
+    <img class="cat-deco cat-deco-tl"
+        src="https://meowboteow.sirv.com/meow%20images/Gemini_Generated_Image_jmggmgjmggmgjmgg-removebg-preview.png"
+        alt="">
+    <img class="cat-deco cat-deco-br"
+        src="https://meowboteow.sirv.com/meow%20images/mysterious_cat_with_cloak-removebg-preview.png" alt="">
+    <img class="cat-deco cat-deco-bl"
+        src="https://meowboteow.sirv.com/meow%20images/Copilot_20251119_190409-removebg-preview.png" alt="">
+    <img class="cat-deco cat-deco-tr"
+        src="https://meowboteow.sirv.com/meow%20images/Gemini_Generated_Image_f4yp2kf4yp2kf4yp-removebg-preview.png"
+        alt="">
+
+    <div class="bg-effects">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <img class="header-mascot" src="https://meowboteow.sirv.com/meow%20images/wizzard.png" alt="MeowBot">
+            <h1>🎮 MeowBot Trivia</h1>
+            <p class="subtitle">Real-time multiplayer trivia • powered by cats 🐱</p>
+        </div>
+
+        <!-- LOADING -->
+        <div id="phase-loading" class="phase active">
+            <div class="status-msg">
+                <div class="spinner"></div>
+                <h2>Connecting...</h2>
+                <p>Setting up your trivia session</p>
+            </div>
+        </div>
+
+        <!-- ERROR -->
+        <div id="phase-error" class="phase">
+            <div class="status-msg">
+                <img src="https://meowboteow.sirv.com/meow%20images/Copilot_20251119_190409-removebg-preview.png"
+                    style="width:80px;height:80px;margin:0 auto 12px;display:block;opacity:0.7;" alt="sad cat">
+                <h2 id="error-title">Session Expired</h2>
+                <p id="error-msg">This trivia session is no longer valid.</p>
+            </div>
+        </div>
+
+        <!-- LOBBY -->
+        <div id="phase-lobby" class="phase">
+            <div class="card">
+                <div class="card-title">👥 Players</div>
+                <div class="players-grid" id="lobby-players"></div>
+            </div>
+
+            <div class="card" id="config-card">
+                <div class="card-title">⚙️ Game Settings</div>
+                <div class="config-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="cfg-category">
+                            <option value="">Any Category</option>
+                            <option value="general">General Knowledge</option>
+                            <option value="books">Books</option>
+                            <option value="film">Film</option>
+                            <option value="music">Music</option>
+                            <option value="television">Television</option>
+                            <option value="videogames">Video Games</option>
+                            <option value="science">Science</option>
+                            <option value="computers">Computers</option>
+                            <option value="mathematics">Mathematics</option>
+                            <option value="sports">Sports</option>
+                            <option value="geography">Geography</option>
+                            <option value="history">History</option>
+                            <option value="politics">Politics</option>
+                            <option value="art">Art</option>
+                            <option value="animals">Animals</option>
+                            <option value="vehicles">Vehicles</option>
+                            <option value="comics">Comics</option>
+                            <option value="gadgets">Gadgets</option>
+                            <option value="anime">Anime & Manga</option>
+                            <option value="cartoons">Cartoons</option>
+                            <option value="mythology">Mythology</option>
+                            <option value="boardgames">Board Games</option>
+                            <option value="celebrities">Celebrities</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Difficulty</label>
+                        <select id="cfg-difficulty">
+                            <option value="">Any Difficulty</option>
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Questions</label>
+                        <input type="number" id="cfg-amount" value="10" min="1" max="50">
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="cfg-type">
+                            <option value="multiple" selected>Multiple Choice</option>
+                            <option value="boolean">True / False</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions" id="lobby-actions">
+                <button class="btn btn-primary" id="btn-start" disabled>🚀 Start Game</button>
+            </div>
+
+            <div class="card" style="padding: 14px 20px;">
+                <div class="card-title" style="margin-bottom: 8px;">🔗 Share Link</div>
+                <div class="share-box">
+                    <input type="text" id="share-link" readonly>
+                    <button class="copy-btn" onclick="copyLink()">Copy</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME -->
+        <div id="phase-game" class="phase">
+            <div class="game-layout">
+                <div class="question-area">
+                    <div class="card question-card">
+                        <div class="question-meta">
+                            <span class="progress" id="q-progress">Question 1/10</span>
+                            <div style="display:flex;gap:6px;">
+                                <span class="badge badge-category" id="q-category"></span>
+                                <span class="badge" id="q-difficulty"></span>
+                            </div>
+                        </div>
+                        <div class="timer-bar-container">
+                            <div class="timer-bar" id="timer-bar"></div>
+                        </div>
+                        <div class="question-text" id="q-text"></div>
+                        <div class="answers-grid" id="answers-grid"></div>
+                    </div>
+                </div>
+                <div class="sidebar">
+                    <div class="card">
+                        <div class="card-title">🏆 Scoreboard</div>
+                        <div class="scoreboard" id="game-scoreboard"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTS -->
+        <div id="phase-results" class="phase">
+            <div class="card" style="text-align:center;">
+                <h2 style="font-size:1.6rem;font-weight:800;margin-bottom:4px;">🏆 Game Over!</h2>
+                <p style="color:var(--text-secondary);font-size:0.9rem;" id="results-subtitle"></p>
+            </div>
+
+            <div class="results-podium" id="results-podium"></div>
+
+            <div class="card">
+                <div class="card-title">📊 Full Results</div>
+                <div class="results-breakdown" id="results-breakdown"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🏆 All-Time Leaderboard</div>
+                <div class="results-breakdown" id="alltime-leaderboard"></div>
+            </div>
+
+            <div class="actions" id="results-actions">
+                <button class="btn btn-primary" id="btn-new-game" style="display:none;" onclick="restartGame()">🔁 New
+                    Game</button>
+                <button class="btn btn-secondary" onclick="location.reload()">🚪 Leave</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Countdown overlay -->
+    <div class="countdown-overlay" id="countdown-overlay">
+        <div style="text-align:center;">
+            <div class="countdown-number" id="countdown-num">3</div>
+            <div class="countdown-text">Get Ready!</div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        const originalTitle = document.title;
+        window.addEventListener('blur', () => {
+            document.title = "Don't CHEAT 😠";
+        });
+
+        window.addEventListener('focus', () => {
+            document.title = originalTitle;
+        });
+        // ========== SOUND EFFECTS (Web Audio API) ==========
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function getAudioCtx() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+            return audioCtx;
+        }
+
+        function playCorrectSound() {
+            try {
+                const ctx = getAudioCtx();
+                // Bright two-tone chime
+                [523.25, 659.25].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.4);
+                    osc.connect(gain).connect(ctx.destination);
+                    osc.start(ctx.currentTime + i * 0.1);
+                    osc.stop(ctx.currentTime + i * 0.1 + 0.4);
+                });
+            } catch (e) { /* audio not supported */ }
+        }
+
+        function playWrongSound() {
+            try {
+                const ctx = getAudioCtx();
+                // Low descending buzz
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.35);
+            } catch (e) { /* audio not supported */ }
+        }
+
+        function playWinnerSound() {
+            try {
+                const ctx = getAudioCtx();
+                // Victory fanfare — ascending notes
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.15);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.5);
+                    osc.connect(gain).connect(ctx.destination);
+                    osc.start(ctx.currentTime + i * 0.15);
+                    osc.stop(ctx.currentTime + i * 0.15 + 0.5);
+                });
+                // Bonus shimmer
+                setTimeout(() => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = 1318.51;
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+                    osc.connect(gain).connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.8);
+                }, 600);
+            } catch (e) { /* audio not supported */ }
+        }
+
+        function playTickSound() {
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.08);
+            } catch (e) { /* audio not supported */ }
+        }
+
+        // ========== STATE ==========
+        const params = new URLSearchParams(window.location.search);
+        const SESSION_ID = params.get('id');
+        let socket = null;
+        let isHost = false;
+        let myDiscordId = null;
+        let currentAnswered = false;
+        let timerInterval = null;
+
+        // ========== INIT ==========
+        async function init() {
+            if (!SESSION_ID) {
+                showError('Invalid Link', 'No session ID found in the URL.');
+                return;
+            }
+
+            try {
+                // Fetch session info
+                const res = await fetch(`/api/trivia/session/${SESSION_ID}`);
+                if (!res.ok) {
+                    showError('Session Expired', 'This trivia session is no longer valid or has expired.');
+                    return;
+                }
+
+                const data = await res.json();
+
+                // Check if identity was passed via URL params (from Discord button)
+                const urlDiscordId = params.get('odiscordId');
+                const urlUsername = params.get('username');
+                const urlDisplayName = params.get('displayName');
+                const urlAvatarUrl = params.get('avatarUrl');
+
+                let identity;
+
+                if (urlDiscordId && urlUsername) {
+                    // Identity provided by Discord — skip the modal entirely
+                    identity = {
+                        odiscordId: urlDiscordId,
+                        username: urlUsername,
+                        displayName: urlDisplayName || urlUsername,
+                        avatarUrl: urlAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(urlUsername)}&background=7C3AED&color=fff&size=128`
+                    };
+                } else {
+                    // Fallback: prompt for identity (shouldn't happen via Discord button flow)
+                    identity = await promptIdentity(data.host);
+                    if (!identity) return;
+                }
+
+                myDiscordId = identity.odiscordId;
+                isHost = (myDiscordId === data.host.odiscordId);
+
+                // Connect socket
+                connectSocket(identity);
+            } catch (e) {
+                console.error(e);
+                showError('Connection Error', 'Failed to connect to the game server.');
+            }
+        }
+
+        // Fallback prompt — only shown if URL params are missing (e.g. someone shares the raw link)
+        function promptIdentity(host) {
+            return new Promise((resolve) => {
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position:fixed;inset:0;z-index:200;background:rgba(15,14,23,0.95);
+                    backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;
+                `;
+
+                modal.innerHTML = `
+                    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+                        padding:32px;max-width:400px;width:90%;backdrop-filter:blur(20px);">
+                        <h2 style="font-size:1.3rem;font-weight:800;margin-bottom:4px;text-align:center;">Join Trivia Game</h2>
+                        <p style="color:var(--text-secondary);font-size:0.85rem;text-align:center;margin-bottom:20px;">
+                            Hosted by <strong>${host.displayName}</strong>
+                        </p>
+                        <div style="text-align:center;margin-bottom:20px;">
+                            <img src="${host.avatarUrl}" style="width:64px;height:64px;border-radius:50%;border:3px solid var(--accent);">
+                        </div>
+                        <div style="margin-bottom:20px;">
+                            <label style="font-size:0.75rem;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">
+                                YOUR DISPLAY NAME
+                            </label>
+                            <input type="text" id="join-username" placeholder="Enter your name" style="
+                                width:100%;background:var(--bg-secondary);border:1px solid var(--border);
+                                color:var(--text-primary);padding:10px 12px;border-radius:var(--radius-sm);
+                                font-family:var(--font);font-size:0.9rem;outline:none;">
+                        </div>
+                        <button id="join-btn" class="btn btn-primary" style="width:100%;">
+                            🎮 Join Game
+                        </button>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+
+                document.getElementById('join-btn').addEventListener('click', () => {
+                    const username = document.getElementById('join-username').value.trim();
+
+                    if (!username) {
+                        showToast('Please enter your name');
+                        return;
+                    }
+
+                    modal.remove();
+                    resolve({
+                        odiscordId: `guest_${username}_${Date.now()}`,
+                        username,
+                        displayName: username,
+                        avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=7C3AED&color=fff&size=128`
+                    });
+                });
+
+                document.getElementById('join-username').focus();
+            });
+        }
+
+        // ========== SOCKET ==========
+        function connectSocket(identity) {
+            socket = io();
+
+            socket.on('connect', () => {
+                console.log('Socket connected');
+                socket.emit('join-game', {
+                    sessionId: SESSION_ID,
+                    odiscordId: identity.odiscordId,
+                    username: identity.username,
+                    displayName: identity.displayName,
+                    avatarUrl: identity.avatarUrl
+                });
+            });
+
+            socket.on('player-list', (data) => {
+                isHost = (myDiscordId === data.hostId);
+                renderLobbyPlayers(data.players, data.hostId);
+                showPhase('lobby');
+
+                // Enable start button for host
+                const startBtn = document.getElementById('btn-start');
+                if (isHost) {
+                    startBtn.disabled = false;
+                    document.getElementById('config-card').style.display = '';
+                } else {
+                    startBtn.style.display = 'none';
+                    document.getElementById('config-card').style.opacity = '0.5';
+                    document.getElementById('config-card').style.pointerEvents = 'none';
+                }
+            });
+
+            socket.on('game-starting', (data) => {
+                showCountdown();
+            });
+
+            socket.on('question', (data) => {
+                hideCountdown();
+                currentAnswered = false;
+                renderQuestion(data);
+                startTimer(data.timeMs || 20000);
+            });
+
+            socket.on('answer-result', (data) => {
+                showAnswerFeedback(data);
+                // Sound effects
+                if (data.correct) playCorrectSound();
+                else playWrongSound();
+            });
+
+            socket.on('scores-update', (data) => {
+                renderScoreboard(data.players, data.answered || []);
+            });
+
+            socket.on('time-up', (data) => {
+                stopTimer();
+                highlightCorrectAnswer(data.correctAnswer);
+                renderScoreboard(data.scores, []);
+            });
+
+            socket.on('game-over', (data) => {
+                stopTimer();
+                renderResults(data);
+                showPhase('results');
+                // Show New Game button if host
+                if (isHost) {
+                    document.getElementById('btn-new-game').style.display = '';
+                }
+                playWinnerSound();
+            });
+
+            socket.on('game-restarted', (data) => {
+                // Server reset into lobby — return to lobby phase
+                renderLobbyPlayers(data.players, data.hostId);
+                isHost = (myDiscordId === data.hostId);
+                showPhase('lobby');
+                // Re-enable config for host
+                const startBtn = document.getElementById('btn-start');
+                if (isHost) {
+                    startBtn.disabled = false;
+                    startBtn.style.display = '';
+                    document.getElementById('config-card').style.display = '';
+                    document.getElementById('config-card').style.opacity = '1';
+                    document.getElementById('config-card').style.pointerEvents = '';
+                } else {
+                    startBtn.style.display = 'none';
+                    document.getElementById('config-card').style.opacity = '0.5';
+                    document.getElementById('config-card').style.pointerEvents = 'none';
+                }
+                // Hide New Game button
+                document.getElementById('btn-new-game').style.display = 'none';
+                showToast('Host started a new game! Back to lobby.');
+            });
+
+            socket.on('game-destroyed', (data) => {
+                showError('Game Ended', data.reason || 'The game has been closed.');
+            });
+
+            socket.on('error-msg', (data) => {
+                showToast(data.message);
+            });
+
+            socket.on('disconnect', () => {
+                showToast('Disconnected from server. Reconnecting...');
+            });
+
+            socket.on('reconnect', () => {
+                showToast('Reconnected!');
+                socket.emit('join-game', {
+                    sessionId: SESSION_ID,
+                    odiscordId: identity.odiscordId,
+                    username: identity.username,
+                    displayName: identity.displayName,
+                    avatarUrl: identity.avatarUrl
+                });
+            });
+
+            // Start button handler
+            document.getElementById('btn-start').addEventListener('click', () => {
+                socket.emit('start-game', {
+                    sessionId: SESSION_ID,
+                    config: {
+                        category: document.getElementById('cfg-category').value,
+                        difficulty: document.getElementById('cfg-difficulty').value,
+                        amount: document.getElementById('cfg-amount').value,
+                        type: document.getElementById('cfg-type').value
+                    }
+                });
+            });
+
+            // Setup share link
+            let pureLink = window.location.href.split('&')[0];
+            document.getElementById('share-link').value = pureLink;
+        }
+
+        // ========== RENDER FUNCTIONS ==========
+        function showPhase(phase) {
+            document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+            document.getElementById(`phase-${phase}`).classList.add('active');
+        }
+
+        function restartGame() {
+            if (socket) {
+                socket.emit('restart-game', { sessionId: SESSION_ID });
+            }
+        }
+
+        function showError(title, msg) {
+            document.getElementById('error-title').textContent = title;
+            document.getElementById('error-msg').textContent = msg;
+            showPhase('error');
+        }
+
+        function renderLobbyPlayers(players, hostId) {
+            const grid = document.getElementById('lobby-players');
+            grid.innerHTML = players.map(p => `
+                <div class="player-card ${p.odiscordId === hostId ? 'host' : ''} ${!p.connected ? 'disconnected' : ''}">
+                    <img class="avatar" src="${p.avatarUrl}" alt="${p.displayName}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(p.displayName)}&background=7C3AED&color=fff'">
+                    <div class="info">
+                        <div class="name">${p.displayName}</div>
+                        <div class="tag">${p.odiscordId === hostId ? '<span class=\'host-badge\'>HOST</span>' : (p.connected ? 'Ready' : 'Disconnected')}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderQuestion(data) {
+            showPhase('game');
+            document.getElementById('q-progress').textContent = `Question ${data.index + 1}/${data.total}`;
+            document.getElementById('q-category').textContent = data.category;
+
+            const diffBadge = document.getElementById('q-difficulty');
+            diffBadge.textContent = data.difficulty.charAt(0).toUpperCase() + data.difficulty.slice(1);
+            diffBadge.className = `badge badge-${data.difficulty}`;
+
+            document.getElementById('q-text').textContent = data.question;
+
+            const grid = document.getElementById('answers-grid');
+            const letters = ['A', 'B', 'C', 'D'];
+            grid.innerHTML = data.answers.map((a, i) => `
+                <button class="answer-btn" data-index="${i}" ${data.alreadyAnswered ? 'disabled' : ''}>
+                    <span class="letter">${letters[i]}</span>
+                    <span>${a}</span>
+                </button>
+            `).join('');
+
+            // Attach click handlers
+            if (!data.alreadyAnswered) {
+                grid.querySelectorAll('.answer-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        if (currentAnswered) return;
+                        currentAnswered = true;
+
+                        // Disable all buttons
+                        grid.querySelectorAll('.answer-btn').forEach(b => {
+                            b.disabled = true;
+                        });
+                        btn.classList.add('selected');
+
+                        socket.emit('submit-answer', {
+                            sessionId: SESSION_ID,
+                            answerIndex: parseInt(btn.dataset.index)
+                        });
+                    });
+                });
+            }
+        }
+
+        function showAnswerFeedback(data) {
+            const grid = document.getElementById('answers-grid');
+            const buttons = grid.querySelectorAll('.answer-btn');
+
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                const answerText = btn.querySelector('span:last-child').textContent;
+                if (answerText === data.correctAnswer) {
+                    btn.classList.add('correct');
+                } else if (answerText === data.selectedAnswer && !data.correct) {
+                    btn.classList.add('incorrect');
+                }
+            });
+        }
+
+        function highlightCorrectAnswer(correctAnswer) {
+            const grid = document.getElementById('answers-grid');
+            grid.querySelectorAll('.answer-btn').forEach(btn => {
+                btn.disabled = true;
+                const answerText = btn.querySelector('span:last-child').textContent;
+                if (answerText === correctAnswer) {
+                    btn.classList.add('correct');
+                }
+            });
+        }
+
+        function renderScoreboard(players, answeredList) {
+            const sb = document.getElementById('game-scoreboard');
+            sb.innerHTML = players.map((p, i) => `
+                <div class="score-entry ${answeredList.includes(p.odiscordId) ? 'answered' : ''}">
+                    <span class="rank">${i + 1}</span>
+                    <img class="avatar-sm" src="${p.avatarUrl}" alt="${p.displayName}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(p.displayName)}&background=7C3AED&color=fff'">
+                    <div class="score-info">
+                        <div class="score-name">${p.displayName}</div>
+                        <div class="score-pts">${p.score} pts</div>
+                    </div>
+                    <span class="check-mark">✓</span>
+                </div>
+            `).join('');
+        }
+
+        function renderResults(data) {
+            const { results, allTimeTop, totalQuestions } = data;
+
+            document.getElementById('results-subtitle').textContent =
+                `${results.length} players • ${totalQuestions} questions`;
+
+            // Podium (top 3)
+            const podium = document.getElementById('results-podium');
+            const podiumClasses = ['first', 'second', 'third'];
+            const trophies = ['🥇', '🥈', '🥉'];
+
+            // Reorder for visual: 2nd, 1st, 3rd
+            const podiumOrder = results.length >= 3 ? [results[1], results[0], results[2]]
+                : results.length === 2 ? [results[1], results[0]]
+                    : results.length === 1 ? [results[0]]
+                        : [];
+            const classOrder = results.length >= 3 ? [1, 0, 2]
+                : results.length === 2 ? [1, 0]
+                    : [0];
+
+            podium.innerHTML = podiumOrder.map((r, i) => {
+                const ci = classOrder[i];
+                const accuracy = r.totalAnswers > 0 ? Math.round((r.correctAnswers / r.totalAnswers) * 100) : 0;
+                return `
+                    <div class="podium-card ${podiumClasses[ci]}">
+                        <span class="trophy">${trophies[ci]}</span>
+                        <img class="avatar-lg" src="${r.avatarUrl}" alt="${r.displayName}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.displayName)}&background=7C3AED&color=fff'">
+                        <div class="podium-name">${r.displayName}</div>
+                        <div class="podium-score">${r.score} pts</div>
+                        <div class="podium-accuracy">${accuracy}% accuracy</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Full breakdown
+            const breakdown = document.getElementById('results-breakdown');
+            breakdown.innerHTML = results.map((r, i) => {
+                const accuracy = r.totalAnswers > 0 ? Math.round((r.correctAnswers / r.totalAnswers) * 100) : 0;
+                return `
+                    <div class="breakdown-row">
+                        <span class="rank-num">${i + 1}</span>
+                        <img class="bd-avatar" src="${r.avatarUrl}" alt="${r.displayName}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.displayName)}&background=7C3AED&color=fff'">
+                        <span class="bd-name">${r.displayName}</span>
+                        <span class="bd-stats">${r.score}/${r.totalAnswers} correct (${accuracy}%)</span>
+                    </div>
+                `;
+            }).join('');
+
+            // All-time leaderboard
+            const leaderboard = document.getElementById('alltime-leaderboard');
+            leaderboard.innerHTML = allTimeTop.map((p, i) => {
+                const accuracy = p.totalQuestions > 0 ? Math.round((p.correctAnswers / p.totalQuestions) * 100) : 0;
+                return `
+                    <div class="breakdown-row">
+                        <span class="rank-num">${i + 1}</span>
+                        <span class="bd-name" style="margin-left:8px;">${p.username}</span>
+                        <span class="bd-stats">${p.totalScore} pts • ${accuracy}% • ${p.gamesPlayed} games</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ========== TIMER ==========
+        function startTimer(durationMs) {
+            stopTimer();
+            const bar = document.getElementById('timer-bar');
+            const start = Date.now();
+            bar.style.width = '100%';
+            bar.classList.remove('warning');
+
+            timerInterval = setInterval(() => {
+                const elapsed = Date.now() - start;
+                const pct = Math.max(0, 100 - (elapsed / durationMs) * 100);
+                bar.style.width = pct + '%';
+
+                if (pct < 30) bar.classList.add('warning');
+
+                if (pct <= 0) stopTimer();
+            }, 50);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        // ========== COUNTDOWN ==========
+        function showCountdown() {
+            const overlay = document.getElementById('countdown-overlay');
+            const num = document.getElementById('countdown-num');
+            overlay.classList.add('active');
+
+            let count = 3;
+            num.textContent = count;
+
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    num.textContent = count;
+                    num.style.animation = 'none';
+                    void num.offsetHeight; // trigger reflow
+                    num.style.animation = 'countBounce 1s ease';
+                } else {
+                    num.textContent = 'GO!';
+                    num.style.animation = 'none';
+                    void num.offsetHeight;
+                    num.style.animation = 'countBounce 1s ease';
+                    setTimeout(() => {
+                        overlay.classList.remove('active');
+                    }, 800);
+                    clearInterval(interval);
+                }
+            }, 1000);
+        }
+
+        function hideCountdown() {
+            document.getElementById('countdown-overlay').classList.remove('active');
+        }
+
+        // ========== UTILS ==========
+        function copyLink() {
+            const input = document.getElementById('share-link');
+            navigator.clipboard.writeText(input.value).then(() => {
+                showToast('Link copied to clipboard!');
+            }).catch(() => {
+                input.select();
+                document.execCommand('copy');
+                showToast('Link copied!');
+            });
+        }
+
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+
+</html>

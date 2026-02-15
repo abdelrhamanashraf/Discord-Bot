@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const axios = require('axios');
 const { getCachedData, setCachedData } = require('../utils/cacheManager');
 const { addToWishlist } = require('../utils/wishlistManager');
@@ -17,36 +17,32 @@ const earthSeasonIcons = {
 };
 const datemonth = new Date().toLocaleDateString('en-CA', { day: 'numeric', month: '2-digit' });
 const seasonIcon = () => {
-    if (datemonth >= '03-21' && datemonth <= '06-20') return earthSeasonIcons.spring; // Spring
-    if (datemonth >= '06-21' && datemonth <= '09-22') return earthSeasonIcons.summer; // Summer
-    if (datemonth >= '09-23' && datemonth <= '12-20') return earthSeasonIcons.fall; // Fall
-    return earthSeasonIcons.winter; // Winter
+    if (datemonth >= '03-21' && datemonth <= '06-20') return earthSeasonIcons.spring;
+    if (datemonth >= '06-21' && datemonth <= '09-22') return earthSeasonIcons.summer;
+    if (datemonth >= '09-23' && datemonth <= '12-20') return earthSeasonIcons.fall;
+    return earthSeasonIcons.winter;
 }
 console.log(`Current Season Icon: ${seasonIcon()}`);
 
 // Cache expiration times
 const CACHE_TIMES = {
-    SEARCH: 345600000, // 1 hour for search results
-    TOP: 21600000,   // 6 hours for top anime
-    SEASON: 345600000 // 24 hours for seasonal anime
+    SEARCH: 345600000,
+    TOP: 21600000,
+    SEASON: 345600000
 };
 
 // Helper function to handle API requests with cooldown and caching
 async function apiRequest(endpoint, cacheTime = CACHE_TIMES.SEARCH) {
-    // Generate cache key from endpoint
     const cacheKey = `anime_${endpoint.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-    // Try to get data from cache first
     const cachedData = await getCachedData(cacheKey, cacheTime);
     if (cachedData) {
         console.log(`Using cached data for ${endpoint}`);
         return cachedData;
     }
 
-    // If not in cache, make API request
     console.log(`Making API request for ${endpoint}`);
 
-    // Check if we need to wait before making another request
     const now = Date.now();
     const lastRequest = apiCooldown.get('lastRequest') || 0;
     const timeToWait = Math.max(0, lastRequest + COOLDOWN_MS - now);
@@ -55,15 +51,11 @@ async function apiRequest(endpoint, cacheTime = CACHE_TIMES.SEARCH) {
         await new Promise(resolve => setTimeout(resolve, timeToWait));
     }
 
-    // Update the last request time
     apiCooldown.set('lastRequest', Date.now());
 
     try {
         const response = await axios.get(`${API_BASE_URL}${endpoint}`);
-
-        // Cache the response data
         await setCachedData(cacheKey, response.data);
-
         return response.data;
     } catch (error) {
         console.error(`Error fetching from Jikan API (${endpoint}):`, error.message);
@@ -71,9 +63,8 @@ async function apiRequest(endpoint, cacheTime = CACHE_TIMES.SEARCH) {
     }
 }
 
-//handle add to wishlist
+// Handle add to wishlist
 async function handleAddToWishlist(interaction, category = "anime") {
-    // Extract ID from customId (format: wishlist_add_anime_ID)
     const parts = interaction.customId.split('_');
     const id = parts[3];
 
@@ -100,8 +91,8 @@ async function handleAddToWishlist(interaction, category = "anime") {
         });
     }
 }
-// Format anime data for display in embeds
 
+// Format anime data for display in embeds
 function formatAnimeData(anime) {
     const genres = anime.genres?.map(g => g.name).join(', ') || 'N/A';
     const studios = anime.studios?.map(s => s.name).join(', ') || 'N/A';
@@ -148,7 +139,6 @@ function createAnimeEmbed(anime, embedColor = '#FF6F61') {
             { name: 'Genres', value: formattedData.genres, inline: true },
             { name: 'Studios', value: formattedData.studios, inline: true },
             { name: 'search on witanime', value: `🔗 [search on witanime](https://witanime.day/?search_param=animes&s=${gurl})`, inline: true }
-
         )
         .setFooter({ text: 'Data from MyAnimeList via Jikan API' })
         .setTimestamp();
@@ -164,13 +154,32 @@ function createAnimeEmbed(anime, embedColor = '#FF6F61') {
     return { embed, row };
 }
 
+// ── Build a select menu from a list of anime ─────────────────
+function buildAnimeSelectMenu(animeList, customId) {
+    const menu = new StringSelectMenuBuilder()
+        .setCustomId(customId)
+        .setPlaceholder('Select an anime for details…')
+        .addOptions(
+            animeList.slice(0, 25).map((anime, i) => {
+                const formattedData = formatAnimeData(anime);
+                return new StringSelectMenuOptionBuilder()
+                    .setLabel(`${i + 1}. ${formattedData.title}`.substring(0, 100))
+                    .setDescription(`⭐ ${formattedData.score} • ${formattedData.type} • ${formattedData.episodes} eps`.substring(0, 100))
+                    .setValue(anime.mal_id.toString());
+            })
+        );
+    return new ActionRowBuilder().addComponents(menu);
+}
+
+// ── Command handlers ─────────────────────────────────────────
+
 // Handle the current season anime command
 async function handleCurrentSeason(interaction) {
     await interaction.deferReply();
 
     try {
         const data = await apiRequest('/seasons/now', CACHE_TIMES.SEASON);
-        const animeList = data.data.slice(0, 10); // Get top 10 anime from current season
+        const animeList = data.data.slice(0, 10);
 
         if (animeList.length === 0) {
             return interaction.editReply('No anime found for the current season.');
@@ -193,22 +202,16 @@ async function handleCurrentSeason(interaction) {
             });
         });
 
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('anime_more_current')
-                    .setLabel('Select Anime for Details')
-                    .setStyle(ButtonStyle.Primary)
-            );
+        const selectRow = buildAnimeSelectMenu(animeList, 'anime_select_current');
 
-        await interaction.editReply({ embeds: [embed], components: [row] });
+        await interaction.editReply({ embeds: [embed], components: [selectRow] });
     } catch (error) {
         console.error('Error fetching current season anime:', error);
         await interaction.editReply('There was an error fetching the current season anime. Please try again later.');
     }
 }
 
-// Handle the top anime command (now with optional genre parameter)
+// Handle the top anime command (with optional genre parameter)
 async function handleTopAnime(interaction) {
     await interaction.deferReply();
 
@@ -221,7 +224,6 @@ async function handleTopAnime(interaction) {
         let description;
 
         if (genre) {
-            // First, get the genre ID from the name
             const genresData = await apiRequest('/genres/anime', CACHE_TIMES.TOP);
             const genres = genresData.data;
 
@@ -231,20 +233,11 @@ async function handleTopAnime(interaction) {
                 return interaction.editReply(`Genre "${genre}" not found. Please try a different genre.`);
             }
 
-            // Now get anime by genre ID
             data = await apiRequest(`/anime?genres=${genreObj.mal_id}&order_by=score&sort=desc&limit=10`, CACHE_TIMES.TOP);
             animeList = data.data;
             title = `🎭 Top ${genre} Anime`;
             description = `Here are the top rated ${genre} anime:`;
-
-            // Store the genre results for button interactions
-            interaction.client.animeGenreResults = interaction.client.animeGenreResults || new Map();
-            interaction.client.animeGenreResults.set(interaction.user.id, {
-                animeList,
-                genreName: genre
-            });
         } else {
-            // Default behavior - get overall top anime
             data = await apiRequest('/top/anime?limit=10', CACHE_TIMES.TOP);
             animeList = data.data;
             title = '🏆 Top Anime';
@@ -272,17 +265,9 @@ async function handleTopAnime(interaction) {
             });
         });
 
-        const customId = genre ? 'anime_more_genre' : 'anime_more_top';
+        const selectRow = buildAnimeSelectMenu(animeList, genre ? 'anime_select_genre' : 'anime_select_top');
 
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId(customId)
-                    .setLabel('Select Anime for Details')
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-        await interaction.editReply({ embeds: [embed], components: [row] });
+        await interaction.editReply({ embeds: [embed], components: [selectRow] });
     } catch (error) {
         console.error('Error fetching top anime:', error);
         await interaction.editReply(genre ?
@@ -311,7 +296,7 @@ async function handleAnimeSearch(interaction) {
             return interaction.editReply({ embeds: [embed], components: [row] });
         }
 
-        // Otherwise, show list of results
+        // Otherwise, show list with select menu
         const embed = new EmbedBuilder()
             .setTitle(`🔍 Search Results for "${query}"`)
             .setColor('#FF6F61')
@@ -329,19 +314,9 @@ async function handleAnimeSearch(interaction) {
             });
         });
 
-        // Store the search results for button interactions
-        interaction.client.animeSearchResults = interaction.client.animeSearchResults || new Map();
-        interaction.client.animeSearchResults.set(interaction.user.id, animeList);
+        const selectRow = buildAnimeSelectMenu(animeList, 'anime_select_search');
 
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('anime_select')
-                    .setLabel('Select Anime for Details')
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-        await interaction.editReply({ embeds: [embed], components: [row] });
+        await interaction.editReply({ embeds: [embed], components: [selectRow] });
     } catch (error) {
         console.error('Error searching for anime:', error);
         await interaction.editReply(`There was an error searching for "${query}". Please try again later.`);
@@ -357,7 +332,7 @@ async function handleAnimeBySeason(interaction) {
 
     try {
         const data = await apiRequest(`/seasons/${year}/${season.toLowerCase()}`, CACHE_TIMES.SEASON);
-        const animeList = data.data.slice(0, 10); // Get top 10 anime from the specified season
+        const animeList = data.data.slice(0, 10);
 
         if (animeList.length === 0) {
             return interaction.editReply(`No anime found for ${season} ${year}.`);
@@ -380,206 +355,54 @@ async function handleAnimeBySeason(interaction) {
             });
         });
 
-        // Store the season results for button interactions
-        interaction.client.animeSeasonResults = interaction.client.animeSeasonResults || new Map();
-        interaction.client.animeSeasonResults.set(interaction.user.id, {
-            animeList,
-            year,
-            season
-        });
+        const selectRow = buildAnimeSelectMenu(animeList, 'anime_select_season');
 
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('anime_more_season')
-                    .setLabel('Select Anime for Details')
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-        await interaction.editReply({ embeds: [embed], components: [row] });
+        await interaction.editReply({ embeds: [embed], components: [selectRow] });
     } catch (error) {
         console.error('Error fetching anime by season:', error);
         await interaction.editReply(`There was an error fetching anime for ${season} ${year}. Please try again later.`);
     }
 }
 
-// Handle button interactions
+// ── Button handler (only wishlist buttons now) ───────────────
 async function handleButton(interaction) {
     const customId = interaction.customId;
 
     if (customId.startsWith('wishlist_add_anime_')) {
         await handleAddToWishlist(interaction);
     }
-    else if (customId === 'anime_select') {
-        // Create a modal for selecting an anime from search results
-        const modal = new ModalBuilder()
-            .setCustomId('anime_select_modal')
-            .setTitle('Select Anime');
-
-        const animeNumberInput = new TextInputBuilder()
-            .setCustomId('anime_number')
-            .setLabel('Enter the number of the anime (1-10)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setMinLength(1)
-            .setMaxLength(2);
-
-        const firstActionRow = new ActionRowBuilder().addComponents(animeNumberInput);
-        modal.addComponents(firstActionRow);
-
-        await interaction.showModal(modal);
-    }
-    else if (customId === 'anime_more_current' || customId === 'anime_more_top' ||
-        customId === 'anime_more_season' || customId === 'anime_more_genre') {
-        // Create a modal for selecting an anime from current season, top anime, specific season, or genre
-        const modalId = customId === 'anime_more_current' ? 'anime_current_modal' :
-            customId === 'anime_more_top' ? 'anime_top_modal' :
-                customId === 'anime_more_season' ? 'anime_season_modal' : 'anime_genre_modal';
-
-        const modal = new ModalBuilder()
-            .setCustomId(modalId)
-            .setTitle('Select Anime');
-
-        const animeNumberInput = new TextInputBuilder()
-            .setCustomId('anime_number')
-            .setLabel('Enter the number of the anime (1-10)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setMinLength(1)
-            .setMaxLength(2);
-
-        const firstActionRow = new ActionRowBuilder().addComponents(animeNumberInput);
-        modal.addComponents(firstActionRow);
-
-        await interaction.showModal(modal);
-    }
 }
 
-// Handle modal submissions
-async function handleModal(interaction) {
+// ── Select menu handler ──────────────────────────────────────
+async function handleSelectMenu(interaction) {
     const customId = interaction.customId;
 
-    if (customId === 'anime_select_modal') {
-        const animeNumber = parseInt(interaction.fields.getTextInputValue('anime_number'));
+    if (!customId.startsWith('anime_select_')) return;
 
-        if (isNaN(animeNumber) || animeNumber < 1 || animeNumber > 10) {
-            return interaction.reply({ content: 'Please enter a valid number between 1 and 10.', ephemeral: true });
-        }
+    const animeId = interaction.values[0];
 
-        const searchResults = interaction.client.animeSearchResults.get(interaction.user.id);
-
-        if (!searchResults || !searchResults[animeNumber - 1]) {
-            return interaction.reply({ content: 'Could not find the selected anime. Please try searching again.', ephemeral: true });
-        }
-
-        const selectedAnime = searchResults[animeNumber - 1];
-        const { embed, row } = createAnimeEmbed(selectedAnime);
+    try {
+        const animeData = await apiRequest(`/anime/${animeId}`);
+        const { embed, row } = createAnimeEmbed(animeData.data);
 
         await interaction.reply({ embeds: [embed], components: [row] });
-    }
-    else if (customId === 'anime_current_modal') {
-        const animeNumber = parseInt(interaction.fields.getTextInputValue('anime_number'));
-
-        if (isNaN(animeNumber) || animeNumber < 1 || animeNumber > 10) {
-            return interaction.reply({ content: 'Please enter a valid number between 1 and 10.', ephemeral: true });
-        }
-
-        try {
-            const data = await apiRequest('/seasons/now');
-            const animeList = data.data;
-
-            if (!animeList || !animeList[animeNumber - 1]) {
-                return interaction.reply({ content: 'Could not find the selected anime. Please try again.', ephemeral: true });
-            }
-
-            const selectedAnime = animeList[animeNumber - 1];
-            const { embed, row } = createAnimeEmbed(selectedAnime);
-
-            await interaction.reply({ embeds: [embed], components: [row] });
-        } catch (error) {
-            console.error('Error fetching anime details:', error);
-            await interaction.reply({ content: 'There was an error fetching the anime details. Please try again later.', ephemeral: true });
-        }
-    }
-    else if (customId === 'anime_top_modal') {
-        const animeNumber = parseInt(interaction.fields.getTextInputValue('anime_number'));
-
-        if (isNaN(animeNumber) || animeNumber < 1 || animeNumber > 10) {
-            return interaction.reply({ content: 'Please enter a valid number between 1 and 10.', ephemeral: true });
-        }
-
-        try {
-            const data = await apiRequest('/top/anime?limit=10');
-            const animeList = data.data;
-
-            if (!animeList || !animeList[animeNumber - 1]) {
-                return interaction.reply({ content: 'Could not find the selected anime. Please try again.', ephemeral: true });
-            }
-
-            const selectedAnime = animeList[animeNumber - 1];
-            const { embed, row } = createAnimeEmbed(selectedAnime);
-
-            await interaction.reply({ embeds: [embed], components: [row] });
-        } catch (error) {
-            console.error('Error fetching anime details:', error);
-            await interaction.reply({ content: 'There was an error fetching the anime details. Please try again later.', ephemeral: true });
-        }
-    }
-    else if (customId === 'anime_season_modal') {
-        const animeNumber = parseInt(interaction.fields.getTextInputValue('anime_number'));
-
-        if (isNaN(animeNumber) || animeNumber < 1 || animeNumber > 10) {
-            return interaction.reply({ content: 'Please enter a valid number between 1 and 10.', ephemeral: true });
-        }
-
-        try {
-            const seasonData = interaction.client.animeSeasonResults.get(interaction.user.id);
-
-            if (!seasonData || !seasonData.animeList || !seasonData.animeList[animeNumber - 1]) {
-                return interaction.reply({ content: 'Could not find the selected anime. Please try searching again.', ephemeral: true });
-            }
-
-            const selectedAnime = seasonData.animeList[animeNumber - 1];
-            const { embed, row } = createAnimeEmbed(selectedAnime);
-
-            await interaction.reply({ embeds: [embed], components: [row] });
-        } catch (error) {
-            console.error('Error fetching anime details:', error);
-            await interaction.reply({ content: 'There was an error fetching the anime details. Please try again later.', ephemeral: true });
-        }
-    }
-    else if (customId === 'anime_genre_modal') {
-        const animeNumber = parseInt(interaction.fields.getTextInputValue('anime_number'));
-
-        if (isNaN(animeNumber) || animeNumber < 1 || animeNumber > 10) {
-            return interaction.reply({ content: 'Please enter a valid number between 1 and 10.', ephemeral: true });
-        }
-
-        try {
-            const genreData = interaction.client.animeGenreResults.get(interaction.user.id);
-
-            if (!genreData || !genreData.animeList || !genreData.animeList[animeNumber - 1]) {
-                return interaction.reply({ content: 'Could not find the selected anime. Please try searching again.', ephemeral: true });
-            }
-
-            const selectedAnime = genreData.animeList[animeNumber - 1];
-            const { embed, row } = createAnimeEmbed(selectedAnime);
-
-            await interaction.reply({ embeds: [embed], components: [row] });
-        } catch (error) {
-            console.error('Error fetching anime details:', error);
-            await interaction.reply({ content: 'There was an error fetching the anime details. Please try again later.', ephemeral: true });
-        }
+    } catch (error) {
+        console.error('Error fetching anime details:', error);
+        await interaction.reply({
+            content: 'There was an error fetching the anime details. Please try again later.',
+            ephemeral: true
+        });
     }
 }
 
+// ── Export ────────────────────────────────────────────────────
 module.exports = [
     {
         name: 'anime-current',
         description: 'Get a list of anime from the current season',
         execute: handleCurrentSeason,
-        handleButton: handleButton,
-        handleModal: handleModal
+        handleButton,
+        handleSelectMenu
     },
     {
         name: 'anime-top',
@@ -587,14 +410,14 @@ module.exports = [
         options: [
             {
                 name: 'genre',
-                type: 3, // STRING
+                type: 3,
                 description: 'Filter by genre (e.g., Action, Romance, Comedy)',
                 required: false
             }
         ],
         execute: handleTopAnime,
-        handleButton: handleButton,
-        handleModal: handleModal
+        handleButton,
+        handleSelectMenu
     },
     {
         name: 'anime-search',
@@ -602,14 +425,14 @@ module.exports = [
         options: [
             {
                 name: 'query',
-                type: 3, // STRING
+                type: 3,
                 description: 'The anime title to search for',
                 required: true
             }
         ],
         execute: handleAnimeSearch,
-        handleButton: handleButton,
-        handleModal: handleModal
+        handleButton,
+        handleSelectMenu
     },
     {
         name: 'anime-season',
@@ -617,13 +440,13 @@ module.exports = [
         options: [
             {
                 name: 'year',
-                type: 4, // INTEGER
+                type: 4,
                 description: 'The year (e.g., 2023)',
                 required: true
             },
             {
                 name: 'season',
-                type: 3, // STRING
+                type: 3,
                 description: 'The season (winter, spring, summer, fall)',
                 required: true,
                 choices: [
@@ -635,7 +458,7 @@ module.exports = [
             }
         ],
         execute: handleAnimeBySeason,
-        handleButton: handleButton,
-        handleModal: handleModal
+        handleButton,
+        handleSelectMenu
     }
 ];

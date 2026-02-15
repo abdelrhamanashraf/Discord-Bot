@@ -39,18 +39,18 @@ function saveScores() {
 async function fetchTriviaQuestions(amount = 5, category = '', difficulty = '') {
     try {
         let url = `https://opentdb.com/api.php?amount=${amount}&type=multiple`;
-        
+
         if (category) {
             url += `&category=${category}`;
         }
-        
+
         if (difficulty) {
             url += `&difficulty=${difficulty}`;
         }
-        
+
         // Add timeout to prevent hanging on slow responses
         const response = await axios.get(url, { timeout: 8000 });
-        
+
         if (response.data.response_code === 0) {
             // Pre-decode all questions and answers to avoid issues
             return response.data.results.map(question => {
@@ -106,15 +106,15 @@ async function showLeaderboard(interaction) {
             leaderboardText = 'No players have participated yet!';
         } else {
             allPlayers.forEach((player, index) => {
-                const accuracy = player.totalQuestions > 0 
-                    ? Math.round((player.correctAnswers / player.totalQuestions) * 100) 
+                const accuracy = player.totalQuestions > 0
+                    ? Math.round((player.correctAnswers / player.totalQuestions) * 100)
                     : 0;
 
                 leaderboardText += `${index + 1}. **${player.username}**\n` +
-                                 `   • Total Score: ${player.totalScore} points\n` +
-                                 `   • Games Played: ${player.gamesPlayed}\n` +
-                                 `   • Accuracy: ${accuracy}%\n` +
-                                 `   • Correct Answers: ${player.correctAnswers}/${player.totalQuestions}\n\n`;
+                    `   • Total Score: ${player.totalScore} points\n` +
+                    `   • Games Played: ${player.gamesPlayed}\n` +
+                    `   • Accuracy: ${accuracy}%\n` +
+                    `   • Correct Answers: ${player.correctAnswers}/${player.totalQuestions}\n\n`;
             });
         }
 
@@ -135,7 +135,7 @@ async function showLeaderboard(interaction) {
 
         // If the interaction hasn't been deferred, defer it
         if (!interaction.deferred && !interaction.replied) {
-            await interaction.deferUpdate().catch(() => {});
+            await interaction.deferUpdate().catch(() => { });
         }
 
         // Send the leaderboard embed
@@ -144,9 +144,9 @@ async function showLeaderboard(interaction) {
         console.error('Error showing leaderboard:', error);
         // Only send error message if we haven't sent a response yet
         if (!interaction.replied) {
-            await interaction.reply({ 
+            await interaction.reply({
                 content: '',
-                ephemeral: true 
+                ephemeral: true
             });
         }
     }
@@ -157,11 +157,11 @@ async function handleTriviaCommand(interaction) {
     try {
         // Defer the reply immediately at the start
         await interaction.deferReply();
-        
+
         const amount = interaction.options.getInteger('questions') || 5;
         const categoryName = interaction.options.getString('category');
         const difficulty = interaction.options.getString('difficulty');
-        
+
         // Map category names to IDs
         const categoryMap = {
             'general': 9,
@@ -183,20 +183,23 @@ async function handleTriviaCommand(interaction) {
             'comics': 29,
             'gadgets': 30,
             'anime': 31,
-            'cartoons': 32
+            'cartoons': 32,
+            'mythology': 20,
+            'boardgames': 16,
+            'celebrities': 26
         };
-        
+
         let categoryId = '';
         if (categoryName && categoryMap[categoryName.toLowerCase()]) {
             categoryId = categoryMap[categoryName.toLowerCase()];
         }
-        
+
         const questions = await fetchTriviaQuestions(amount, categoryId, difficulty);
-        
+
         if (!questions || questions.length === 0) {
             return interaction.editReply('Sorry, I couldn\'t fetch any trivia questions at the moment. Please try again later.');
         }
-        
+
         // Start the trivia game
         let currentQuestionIndex = 0;
         let score = 0;
@@ -205,18 +208,18 @@ async function handleTriviaCommand(interaction) {
         const creatorId = interaction.user.id;
         let lastAnswerTime = Date.now();
         let answeredUsers = new Set(); // Track users who answered the current question
-        
+
         // Function to show the current question
         async function showQuestion() {
             const question = questions[currentQuestionIndex];
             answeredUsers.clear(); // Reset the list of users who answered
-            
+
             // Combine correct and incorrect answers and shuffle them
             const answers = [
                 decodeHTML(question.correct_answer),
                 ...question.incorrect_answers.map(a => decodeHTML(a))
             ].sort(() => Math.random() - 0.5);
-            
+
             // Create the question embed
             const embed = new EmbedBuilder()
                 .setTitle(`Trivia Question ${currentQuestionIndex + 1}/${questions.length}`)
@@ -224,10 +227,10 @@ async function handleTriviaCommand(interaction) {
                 .setColor('#FFD700')
                 .setFooter({ text: `Started by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
                 .setTimestamp();
-            
+
             // Create buttons for answers
             const row = new ActionRowBuilder();
-            
+
             answers.forEach((answer, index) => {
                 row.addComponents(
                     new ButtonBuilder()
@@ -236,12 +239,12 @@ async function handleTriviaCommand(interaction) {
                         .setStyle(ButtonStyle.Primary)
                 );
             });
-            
+
             // Add answer text to embed
             answers.forEach((answer, index) => {
                 embed.addFields({ name: `${String.fromCharCode(65 + index)}.`, value: answer, inline: false });
             });
-            
+
             // Add participant scores to the embed
             if (Object.keys(participantScores).length > 0) {
                 let scoreText = '';
@@ -250,10 +253,10 @@ async function handleTriviaCommand(interaction) {
                     .forEach((participant) => {
                         scoreText += `**${participant.username}**: ${participant.score} points\n`;
                     });
-                
+
                 embed.addFields({ name: '🏆 Current Scores', value: scoreText, inline: false });
             }
-            
+
             // Send or update the message
             let message;
             if (currentQuestionIndex === 0) {
@@ -261,14 +264,14 @@ async function handleTriviaCommand(interaction) {
             } else {
                 message = await interaction.editReply({ embeds: [embed], components: [row] });
             }
-            
+
             // Set up collector for multiple answers
             const filter = i => i.customId.startsWith('trivia_answer_') && !answeredUsers.has(i.user.id);
-            const collector = message.createMessageComponentCollector({ 
-                filter, 
+            const collector = message.createMessageComponentCollector({
+                filter,
                 time: 20000 // 20 seconds per question
             });
-            
+
             // Handle answer submissions
             collector.on('collect', async (response) => {
                 try {
@@ -277,10 +280,10 @@ async function handleTriviaCommand(interaction) {
                     const selectedAnswer = answers[selectedIndex];
                     const isCorrect = selectedAnswer === decodeHTML(question.correct_answer);
                     const respondingUser = response.user;
-                    
+
                     // Mark this user as having answered
                     answeredUsers.add(respondingUser.id);
-                    
+
                     // Track participant scores
                     if (!participantScores[respondingUser.id]) {
                         participantScores[respondingUser.id] = {
@@ -290,17 +293,17 @@ async function handleTriviaCommand(interaction) {
                             answers: 0
                         };
                     }
-                    
+
                     if (isCorrect) {
                         participantScores[respondingUser.id].score++;
                     }
                     participantScores[respondingUser.id].answers++;
-                    
+
                     // Update creator's score if they answered
                     if (respondingUser.id === creatorId && isCorrect) {
                         score++;
                     }
-                    
+
                     // Store the user's answer
                     userAnswers.push({
                         question: question.question,
@@ -309,23 +312,23 @@ async function handleTriviaCommand(interaction) {
                         isCorrect,
                         answeredBy: respondingUser.username
                     });
-                    
+
                     // Show feedback to the user who answered
                     const feedbackEmbed = new EmbedBuilder()
                         .setTitle(isCorrect ? '✅ Correct!' : '❌ Incorrect!')
                         .setDescription(`You answered: **${selectedAnswer}**\n\n${isCorrect ? 'Great job!' : `The correct answer was: **${decodeHTML(question.correct_answer)}**`}`)
                         .setColor(isCorrect ? '#00FF00' : '#FF0000');
-                    
+
                     // Use deferUpdate() first to acknowledge the interaction, then follow up with an ephemeral message
                     await response.deferUpdate().catch(e => console.error('Error deferring update:', e));
-                    
+
                     // Send ephemeral feedback as a follow-up message
                     await response.followUp({ embeds: [feedbackEmbed], ephemeral: true })
                         .catch(error => {
                             console.error('Error sending follow-up message:', error);
                             // If we can't send a follow-up, we'll just continue with the game
                         });
-                    
+
                     // Update the main embed with current scores
                     let scoreText = '';
                     Object.values(participantScores)
@@ -334,9 +337,9 @@ async function handleTriviaCommand(interaction) {
                             const hasAnswered = answeredUsers.has(participant.id) ? '✓ ' : '';
                             scoreText += `${hasAnswered}**${participant.username}**: ${participant.score} points\n`;
                         });
-                    
+
                     const updatedEmbed = EmbedBuilder.from(embed);
-                    
+
                     // Update or add the scores field
                     const scoreFieldIndex = updatedEmbed.data.fields.findIndex(field => field.name === '🏆 Current Scores');
                     if (scoreFieldIndex !== -1) {
@@ -344,7 +347,7 @@ async function handleTriviaCommand(interaction) {
                     } else {
                         updatedEmbed.addFields({ name: '🏆 Current Scores', value: scoreText, inline: false });
                     }
-                    
+
                     // Update the main message with new scores
                     await interaction.editReply({ embeds: [updatedEmbed], components: [row] })
                         .catch(error => {
@@ -355,7 +358,7 @@ async function handleTriviaCommand(interaction) {
                     // Continue with the game even if there's an error with one user's interaction
                 }
             });
-            
+
             // When the time is up
             collector.on('end', async (collected) => {
                 // Show the correct answer to everyone
@@ -364,7 +367,7 @@ async function handleTriviaCommand(interaction) {
                     .setTitle('⏱️ Time\'s Up!')
                     .setDescription(`The correct answer was: **${correctAnswer}**\n\n${collected.size} users answered this question.`)
                     .setColor('#FF9900');
-                
+
                 // Add participant scores to the embed
                 if (Object.keys(participantScores).length > 0) {
                     let scoreText = '';
@@ -373,12 +376,12 @@ async function handleTriviaCommand(interaction) {
                         .forEach((participant) => {
                             scoreText += `**${participant.username}**: ${participant.score} points\n`;
                         });
-                    
+
                     timeoutEmbed.addFields({ name: '🏆 Current Scores', value: scoreText, inline: false });
                 }
-                
+
                 await interaction.editReply({ embeds: [timeoutEmbed], components: [] });
-                
+
                 // If no one answered, record it
                 if (collected.size === 0) {
                     userAnswers.push({
@@ -389,11 +392,11 @@ async function handleTriviaCommand(interaction) {
                         answeredBy: 'No one'
                     });
                 }
-                
+
                 // Move to the next question after a delay
                 setTimeout(async () => {
                     currentQuestionIndex++;
-                    
+
                     if (currentQuestionIndex < questions.length) {
                         await showQuestion();
                     } else {
@@ -402,7 +405,7 @@ async function handleTriviaCommand(interaction) {
                 }, 3000);
             });
         }
-        
+
         // Function to show final results
         async function showResults() {
             // Update scores for all participants
@@ -417,21 +420,21 @@ async function handleTriviaCommand(interaction) {
                         totalQuestions: 0
                     };
                 }
-                
+
                 triviaScores[userId].username = userData.username;
                 triviaScores[userId].totalScore += userData.score;
                 triviaScores[userId].gamesPlayed += 1;
                 triviaScores[userId].correctAnswers += userData.score;
                 triviaScores[userId].totalQuestions += userData.answers;
-                
+
                 saveScores();
             });
-            
+
             // Get top 5 players
             const topPlayers = Object.values(triviaScores)
                 .sort((a, b) => b.totalScore - a.totalScore)
                 .slice(0, 5);
-            
+
             // Create the results embed
             const resultsEmbed = new EmbedBuilder()
                 .setTitle('🎮 Trivia Results')
@@ -440,7 +443,7 @@ async function handleTriviaCommand(interaction) {
                 .setThumbnail(interaction.user.displayAvatarURL())
                 .setFooter({ text: `Thanks for playing!` })
                 .setTimestamp();
-            
+
             // Add participant results for this game
             let participantText = '';
             Object.values(participantScores)
@@ -448,33 +451,33 @@ async function handleTriviaCommand(interaction) {
                 .forEach((participant, index) => {
                     participantText += `${index + 1}. **${participant.username}**: ${participant.score}/${participant.answers} correct\n`;
                 });
-            
+
             if (participantText) {
                 resultsEmbed.addFields(
                     { name: '🏅 This Game\'s Participants', value: participantText, inline: false }
                 );
             }
-            
+
             // Add leaderboard
             let leaderboardText = '';
             topPlayers.forEach((player, index) => {
                 leaderboardText += `${index + 1}. **${player.username}**: ${player.totalScore} points (${Math.round((player.correctAnswers / player.totalQuestions) * 100)}% accuracy)\n`;
             });
-            
+
             resultsEmbed.addFields(
                 { name: '🏆 All-Time Leaderboard', value: leaderboardText || 'No players yet', inline: false }
             );
-            
+
             // Add a summary of the questions and answers
             let summaryText = '';
             userAnswers.forEach((answer, index) => {
                 summaryText += `**Q${index + 1}**: ${answer.isCorrect ? '✅' : '❌'} ${decodeHTML(answer.question).substring(0, 30)}${answer.question.length > 30 ? '...' : ''} (${answer.answeredBy})\n`;
             });
-            
+
             resultsEmbed.addFields(
                 { name: 'Summary', value: summaryText, inline: false }
             );
-            
+
             // Create button for playing again
             const row = new ActionRowBuilder()
                 .addComponents(
@@ -487,18 +490,18 @@ async function handleTriviaCommand(interaction) {
                         .setLabel('View Full Leaderboard')
                         .setStyle(ButtonStyle.Primary)
                 );
-            
+
             await interaction.editReply({ embeds: [resultsEmbed], components: [row] });
-            
+
             // Collect button interactions
             try {
                 // Allow anyone to start a new game or view leaderboard
                 const filter = i => i.customId === 'trivia_play_again' || i.customId === 'trivia_leaderboard';
                 const response = await interaction.channel.awaitMessageComponent({ filter, time: 60000 });
-                
+
                 // Acknowledge the button interaction immediately
                 await response.deferUpdate();
-                
+
                 if (response.customId === 'trivia_play_again') {
                     // Create a new interaction for the new game
                     const newInteraction = {
@@ -515,7 +518,7 @@ async function handleTriviaCommand(interaction) {
                         deferReply: async () => response.editReply({ content: 'Starting new game...' }),
                         editReply: async (content) => response.editReply(content)
                     };
-                    
+
                     // Start a new game
                     await handleTriviaCommand(newInteraction);
                 } else if (response.customId === 'trivia_leaderboard') {
@@ -526,16 +529,16 @@ async function handleTriviaCommand(interaction) {
                 // Don't try to respond to the interaction here, as it might have timed out
             }
         }
-        
+
         // Start showing questions
         await showQuestion();
     } catch (error) {
         console.error('Error in handleTriviaCommand:', error);
         // Only try to reply if the interaction hasn't been acknowledged
         if (!interaction.deferred && !interaction.replied) {
-            await interaction.reply({ 
+            await interaction.reply({
                 content: 'There was an error starting the trivia game. Please try again.',
-                ephemeral: true 
+                ephemeral: true
             });
         }
     }
@@ -546,12 +549,12 @@ async function handleTriviaCommand(interaction) {
 module.exports = {
     name: 'trivia',
     description: 'Play a trivia game with multiple-choice questions',
-    execute: async function(interaction) {
+    execute: async function (interaction) {
         return handleTriviaCommand(interaction);
     },
-    handleButton: async function(interaction) {
+    handleButton: async function (interaction) {
         const customId = interaction.customId;
-        
+
         if (customId === 'trivia_play_again') {
             // Create a completely new interaction for the new game
             const newOptions = {
@@ -559,7 +562,7 @@ module.exports = {
                 category: null,
                 difficulty: null
             };
-            
+
             // Create a new interaction object with default options
             const newInteraction = {
                 user: interaction.user,
@@ -575,7 +578,7 @@ module.exports = {
                 editReply: async (content) => interaction.editReply(content),
                 channel: interaction.channel
             };
-            
+
             // Start a completely new game
             await handleTriviaCommand(newInteraction);
         } else if (customId === 'trivia_leaderboard') {

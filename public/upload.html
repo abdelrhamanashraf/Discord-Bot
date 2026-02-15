@@ -462,7 +462,7 @@
                 } else if (provider === 'rootz') {
                     statusDiv.innerText = 'Initializing Rootz upload...';
 
-                    const MULTIPART_THRESHOLD = 5 * 1024 * 1024; // 5MB
+                    const MULTIPART_THRESHOLD = 4 * 1024 * 1024; // 4MB
 
                     if (file.size < MULTIPART_THRESHOLD) {
                         // --- Small File Upload (< 5MB) ---

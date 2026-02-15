@@ -154,44 +154,8 @@ const commands = [
     ],
   },
   {
-    name: "note",
-    description: "Save a note",
-    options: [
-      {
-        name: "title",
-        type: 3, // STRING
-        description: "Title of the note",
-        required: true,
-      },
-      {
-        name: "content",
-        type: 3, // STRING
-        description: "Content of the note",
-        required: true,
-      },
-      {
-        name: "save_to_channel",
-        type: 5, // BOOLEAN
-        description: "Save the note to the current channel",
-        required: false,
-      },
-    ],
-  },
-  {
-    name: "getnotes",
-    description: "View all your saved notes",
-  },
-  {
-    name: "getnote",
-    description: "Retrieve a saved note",
-    options: [
-      {
-        name: "title",
-        type: 3, // STRING
-        description: "Title of the note to retrieve",
-        required: true,
-      },
-    ],
+    name: "mynotes",
+    description: "View and manage your personal notes",
   },
   {
     name: "help",
@@ -464,7 +428,10 @@ const commands = [
           { name: "Comics", value: "comics" },
           { name: "Gadgets", value: "gadgets" },
           { name: "Anime & Manga", value: "anime" },
-          { name: "Cartoons", value: "cartoons" }
+          { name: "Cartoons", value: "cartoons" },
+          { name: "Mythology", value: "mythology" },
+          { name: "Celebrities", value: "celebrities" },
+          { name: "BoardGames", value: "boardgames" }
         ]
       },
       {
@@ -569,6 +536,11 @@ const commands = [
         name: "disconnect",
         type: 1, // SUB_COMMAND
         description: "Disconnect from WhatsApp"
+      },
+      {
+        name: "reconnect",
+        type: 1, // SUB_COMMAND
+        description: "Force reconnect to WhatsApp (use if connection is buggy)"
       },
       {
         name: "groups",
@@ -701,6 +673,21 @@ const commands = [
         required: true
       }
     ]
+  },
+  {
+    name: "invite",
+    description: "Generate a decorated QR code for a Discord invite link",
+
+  },
+  {
+    name: "webtrivia",
+    description: "Play a trivia game about the web",
+
+  },
+  {
+    name: "codenames",
+    description: "Start a Codenames-style word spy game in the browser",
+
   }
 ];
 
@@ -823,26 +810,14 @@ client.on("interactionCreate", async (interaction) => {
     const parts = interaction.customId.split("_");
 
     // Handle different button formats
-    if (
-      interaction.customId.startsWith("save_note_") ||
-      interaction.customId.startsWith("edit_note_") ||
-      interaction.customId.startsWith("delete_note_") ||
-      interaction.customId.startsWith("confirm_delete_")
-    ) {
-      commandName = "getnote";
+    if (interaction.customId.startsWith("notes_")) {
+      commandName = "mynotes";
     } else if (interaction.customId.startsWith("vote_")) {
       commandName = "vote";
     } else if (interaction.customId.startsWith("end_chat_")) {
       commandName = "chat";
     } else if (interaction.customId === "end_poll") {
       commandName = "vote";
-    } else if (
-      interaction.customId === "prev_page" ||
-      interaction.customId === "next_page"
-    ) {
-      commandName = "getnotes";
-    } else if (interaction.customId === "cancel_delete") {
-      commandName = "getnote";
     } else if (
       interaction.customId === "confirm_replace_recurring" ||
       interaction.customId === "cancel_replace_recurring"
@@ -865,6 +840,30 @@ client.on("interactionCreate", async (interaction) => {
         }
       }
       return; // Exit if no handler found
+    } else if (interaction.customId.startsWith("webtrivia_join_")) {
+      // Handle web trivia join button — captures user identity
+      const webtriviaCommand = client.commands.get("webtrivia");
+      if (webtriviaCommand && webtriviaCommand.handleButton) {
+        try {
+          await webtriviaCommand.handleButton(interaction);
+          return;
+        } catch (error) {
+          console.error(`Error handling webtrivia button:`, error);
+        }
+      }
+      return;
+    } else if (interaction.customId.startsWith("codenames_join_")) {
+      // Handle codenames join button — captures user identity
+      const codenamesCommand = client.commands.get("codenames");
+      if (codenamesCommand && codenamesCommand.handleButton) {
+        try {
+          await codenamesCommand.handleButton(interaction);
+          return;
+        } catch (error) {
+          console.error(`Error handling codenames button:`, error);
+        }
+      }
+      return;
     } else if (interaction.customId.startsWith("trivia_")) {
       // Handle trivia buttons
       const triviaCommand = client.commands.get("trivia");
@@ -1022,15 +1021,13 @@ client.on("interactionCreate", async (interaction) => {
     console.log(`Received modal submission: ${interaction.customId}`);
 
     // Find the appropriate command to handle the modal
-    if (interaction.customId.startsWith("edit_modal_")) {
-      const command = client.commands.get("getnote");
+    if (interaction.customId.startsWith("notes_")) {
+      const command = client.commands.get("mynotes");
       if (command && command.handleModal) {
         try {
-          console.log(`Executing modal handler for: getnote`);
           await command.handleModal(interaction);
-          console.log(`Modal handler for getnote executed successfully`);
         } catch (error) {
-          console.error(`Error executing modal handler for getnote:`, error);
+          console.error(`Error executing modal handler for mynotes:`, error);
           if (!interaction.replied && !interaction.deferred) {
             await interaction
               .reply({
@@ -1040,35 +1037,7 @@ client.on("interactionCreate", async (interaction) => {
               .catch(console.error);
           }
         }
-      } else {
-        console.warn(`No modal handler found for: ${interaction.customId}`);
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction
-            .reply({
-              content: "This modal is not currently functional.",
-              ephemeral: true,
-            })
-            .catch(console.error);
-        }
       }
-    } else if (interaction.customId.startsWith("anime_")) {
-      // Handle anime modals
-      const animeCommands = ["anime-current", "anime-top", "anime-search"];
-
-      // Find the first anime command that has a handleModal method
-      for (const cmdName of animeCommands) {
-        const command = client.commands.get(cmdName);
-        if (command && command.handleModal) {
-          try {
-            await command.handleModal(interaction);
-            return; // Exit after handling
-          } catch (error) {
-            console.error(`Error handling anime modal for ${cmdName}:`, error);
-          }
-        }
-      }
-      return; // Exit if no handler found
-
     } else if (interaction.customId.startsWith("whatsapp_")) {
       // Handle WhatsApp modals
       const command = client.commands.get("whatsapp");
@@ -1097,12 +1066,28 @@ client.on("interactionCreate", async (interaction) => {
 
     // Extract command name from customId
     let commandName;
-    if (interaction.customId.startsWith("whatsapp_")) {
+    if (interaction.customId === 'notes_select') {
+      commandName = "mynotes";
+    } else if (interaction.customId.startsWith("anime_select_")) {
+      // Route to the first anime command that has handleSelectMenu
+      const animeCommands = ["anime-current", "anime-top", "anime-search", "anime-season"];
+      for (const cmdName of animeCommands) {
+        const cmd = client.commands.get(cmdName);
+        if (cmd && cmd.handleSelectMenu) {
+          try {
+            await cmd.handleSelectMenu(interaction);
+            return;
+          } catch (error) {
+            console.error(`Error handling anime select menu for ${cmdName}:`, error);
+          }
+        }
+      }
+      return;
+    } else if (interaction.customId.startsWith("whatsapp_")) {
       commandName = "whatsapp";
     } else if (interaction.customId.startsWith("val_match_")) {
       commandName = "valorant";
     } else if (interaction.customId.startsWith("movie_") || interaction.customId.startsWith("series_")) {
-
       commandName = "movie-search";
     } else if (interaction.customId === "wishlist_select") {
       commandName = "wishlist";

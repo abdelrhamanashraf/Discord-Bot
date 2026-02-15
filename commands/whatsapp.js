@@ -95,56 +95,158 @@ function saveScheduledMessages() {
 
 
 // Initialize WhatsApp client
+let isInitializing = false; // Track initialization state
+let initStartTime = 0; // Track when initialization started
+
+// Reset initialization if stuck for more than 2 minutes
+function checkInitTimeout() {
+    if (isInitializing && initStartTime > 0) {
+        const elapsed = Date.now() - initStartTime;
+        if (elapsed > 120000) { // 2 minutes
+            console.log('[WhatsApp] Initialization timeout detected, resetting state...');
+            isInitializing = false;
+            initStartTime = 0;
+        }
+    }
+}
+
+// Force reset initialization state
+function forceResetInit() {
+    console.log('[WhatsApp] Force resetting initialization state');
+    isInitializing = false;
+    initStartTime = 0;
+    isWhatsAppReady = false;
+}
+
 async function initWhatsAppClient() {
-    if (whatsappClient) {
+    // Check for stale initialization
+    checkInitTimeout();
+
+    // If already ready, return existing client
+    if (whatsappClient && isWhatsAppReady) {
         return whatsappClient;
     }
 
-    // Initialize the client with standard puppeteer configuration
-    whatsappClient = new WhatsAppClient({
-        authStrategy: new LocalAuth({
-            dataPath: path.join(__dirname, '..', '.wwebjs_auth')
-        }),
-        puppeteer: {
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu'
-            ]
+    // If already initializing, wait for it with timeout
+    if (isInitializing) {
+        console.log('[WhatsApp] Client is already initializing, waiting...');
+        let waitCount = 0;
+        while (isInitializing && waitCount < 30) { // Reduced to 30 seconds
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            waitCount++;
+            checkInitTimeout(); // Check if timeout exceeded
         }
-    });
 
-    whatsappClient.on('qr', (qr) => {
-        console.log('WhatsApp QR Code received');
-        qrCodeData = qr;
-    });
+        // If still initializing after wait, force reset
+        if (isInitializing) {
+            console.log('[WhatsApp] Initialization appears stuck, resetting...');
+            forceResetInit();
+        }
 
-    whatsappClient.on('ready', () => {
-        console.log('WhatsApp client is ready!');
-        isWhatsAppReady = true;
-        qrCodeData = null;
-    });
+        if (whatsappClient && isWhatsAppReady) return whatsappClient;
+    }
 
-    whatsappClient.on('authenticated', () => {
-        console.log('WhatsApp client authenticated');
-    });
+    isInitializing = true;
+    initStartTime = Date.now();
 
-    whatsappClient.on('auth_failure', (msg) => {
-        console.error('WhatsApp authentication failed:', msg);
-        isWhatsAppReady = false;
-    });
+    try {
+        // Cleanup any existing broken client
+        if (whatsappClient) {
+            console.log('[WhatsApp] Cleaning up existing client...');
+            try {
+                await whatsappClient.destroy();
+            } catch (err) {
+                console.log('[WhatsApp] Cleanup warning:', err.message);
+            }
+            whatsappClient = null;
+            isWhatsAppReady = false;
+            qrCodeData = null;
+        }
 
-    whatsappClient.on('disconnected', (reason) => {
-        console.log('WhatsApp client disconnected:', reason);
-        isWhatsAppReady = false;
-    });
+        // Initialize the client with puppeteer configuration
+        whatsappClient = new WhatsAppClient({
+            authStrategy: new LocalAuth({
+                dataPath: path.join(__dirname, '..', '.wwebjs_auth')
+            }),
+            puppeteer: {
+                headless: true,
+                timeout: 60000,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--disable-gpu'
+                ]
+            },
+            // Handle navigation/context issues
+            qrMaxRetries: 3,
+            restartOnAuthFail: true
+        });
 
-    whatsappClient.on('message', async (message) => {
+        whatsappClient.on('qr', (qr) => {
+            console.log('[WhatsApp] QR Code received');
+            qrCodeData = qr;
+        });
+
+        whatsappClient.on('ready', () => {
+            console.log('[WhatsApp] Client is ready!');
+            isWhatsAppReady = true;
+            isInitializing = false;
+            initStartTime = 0;
+            qrCodeData = null;
+            // Setup message handler once client is ready
+            setupMessageHandler(whatsappClient);
+        });
+
+        whatsappClient.on('authenticated', () => {
+            console.log('[WhatsApp] Client authenticated');
+        });
+
+        whatsappClient.on('auth_failure', (msg) => {
+            console.error('[WhatsApp] Authentication failed:', msg);
+            isWhatsAppReady = false;
+            isInitializing = false;
+            initStartTime = 0;
+        });
+
+        whatsappClient.on('disconnected', async (reason) => {
+            console.log('[WhatsApp] Client disconnected:', reason);
+            isWhatsAppReady = false;
+            isInitializing = false;
+            initStartTime = 0;
+
+            // Auto-cleanup on disconnect
+            try {
+                if (whatsappClient) {
+                    await whatsappClient.destroy();
+                }
+            } catch (err) {
+                console.log('[WhatsApp] Disconnect cleanup warning:', err.message);
+            }
+            whatsappClient = null;
+            qrCodeData = null;
+        });
+
+        // Handle loading screen timeout
+        whatsappClient.on('loading_screen', (percent, message) => {
+            console.log(`[WhatsApp] Loading: ${percent}% - ${message}`);
+        });
+
+        return whatsappClient;
+    } catch (error) {
+        console.error('[WhatsApp] initWhatsAppClient error:', error.message);
+        isInitializing = false;
+        initStartTime = 0;
+        whatsappClient = null;
+        throw error;
+    }
+}
+
+// Setup message handler separately after client is ready
+function setupMessageHandler(client) {
+    client.on('message', async (message) => {
         try {
             // Ignore messages from groups and status messages
             if (message.from.includes('@g.us') || message.from === 'status@broadcast') {
@@ -315,8 +417,6 @@ async function initWhatsAppClient() {
             console.error('[WhatsApp] Error handling WhatsApp message:', error);
         }
     });
-
-    return whatsappClient;
 }
 
 // Format phone number for WhatsApp
@@ -344,19 +444,56 @@ async function handleWhatsAppConnect(interaction) {
         });
     }
 
+    // Check for stale initialization first
+    checkInitTimeout();
+
+    // Check if already initializing
+    if (isInitializing) {
+        const elapsed = initStartTime > 0 ? Math.round((Date.now() - initStartTime) / 1000) : 0;
+
+        // If stuck for more than 60 seconds, suggest reconnect
+        if (elapsed > 60) {
+            return interaction.editReply({
+                content: `⚠️ WhatsApp connection appears stuck (${elapsed}s elapsed).\n\nUse \`/whatsapp reconnect\` to force a fresh connection.`,
+                ephemeral: true
+            });
+        }
+
+        return interaction.editReply({
+            content: `⏳ WhatsApp is currently connecting (${elapsed}s elapsed). Please wait...\n\nIf this takes too long, use \`/whatsapp reconnect\`.`,
+            ephemeral: true
+        });
+    }
+
     try {
         const client = await initWhatsAppClient();
 
-        // Initialize the client
-        await client.initialize();
+        // Initialize the client only if not already initializing
+        try {
+            await client.initialize();
+        } catch (initError) {
+            // If initialization fails with session error, try to recover
+            if (initError.message.includes('Session') ||
+                initError.message.includes('already') ||
+                initError.message.includes('running')) {
+                console.log('[WhatsApp] Initialization already in progress or session issue, waiting...');
+            } else {
+                throw initError;
+            }
+        }
 
         // Wait for QR code with timeout
         let attempts = 0;
-        const maxAttempts = 30; // 30 seconds
+        const maxAttempts = 45; // 45 seconds (increased timeout)
 
         while (!qrCodeData && !isWhatsAppReady && attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 1000));
             attempts++;
+
+            // Log progress every 10 seconds
+            if (attempts % 10 === 0) {
+                console.log(`[WhatsApp] Waiting for QR/ready... ${attempts}/${maxAttempts}s`);
+            }
         }
 
         if (isWhatsAppReady) {
@@ -390,8 +527,9 @@ async function handleWhatsAppConnect(interaction) {
             });
         }
 
+        // If no QR and not ready, something went wrong
         return interaction.editReply({
-            content: '❌ Failed to generate QR code. Please try again.',
+            content: '❌ Failed to generate QR code. Try `/whatsapp reconnect` to force a fresh connection.',
             ephemeral: true
         });
 
@@ -663,6 +801,116 @@ async function handleWhatsAppDisconnect(interaction) {
     }
 }
 
+// Handle WhatsApp force reconnect
+async function handleWhatsAppReconnect(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+        // Force cleanup any existing client
+        if (whatsappClient) {
+            console.log('[WhatsApp] Force destroying existing client...');
+            try {
+                await whatsappClient.destroy();
+            } catch (err) {
+                console.log('[WhatsApp] Cleanup error (ignoring):', err.message);
+            }
+            whatsappClient = null;
+        }
+
+        isWhatsAppReady = false;
+        isInitializing = false;
+        initStartTime = 0;
+        qrCodeData = null;
+
+        // Small delay to ensure cleanup is complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        await interaction.editReply({
+            content: '🔄 Cleaned up old session. Now starting fresh connection...',
+            ephemeral: true
+        });
+
+        // Initialize fresh client
+        const client = await initWhatsAppClient();
+
+        // Initialize the client
+        await client.initialize();
+
+        // Wait for QR code OR ready state with extended timeout
+        // Authentication can take a while to become "ready"
+        let attempts = 0;
+        const maxAttempts = 90; // 90 seconds - authentication can take time
+        let lastStatus = '';
+
+        while (!qrCodeData && !isWhatsAppReady && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            attempts++;
+
+            // Log progress every 15 seconds
+            if (attempts % 15 === 0) {
+                console.log(`[WhatsApp] Reconnect waiting... ${attempts}/${maxAttempts}s, ready=${isWhatsAppReady}, qr=${!!qrCodeData}`);
+            }
+
+            // Update message at 30 seconds if still waiting
+            if (attempts === 30 && !isWhatsAppReady && !qrCodeData) {
+                try {
+                    await interaction.editReply({
+                        content: '⏳ Still connecting... This may take up to a minute if you have a cached session.',
+                        ephemeral: true
+                    });
+                } catch (e) { /* ignore edit errors */ }
+            }
+        }
+
+        console.log(`[WhatsApp] Reconnect loop finished: ready=${isWhatsAppReady}, qr=${!!qrCodeData}, attempts=${attempts}`);
+
+        if (isWhatsAppReady) {
+            return interaction.editReply({
+                content: '✅ WhatsApp reconnected successfully!',
+                ephemeral: true
+            });
+        }
+
+        if (qrCodeData) {
+            const qrImage = await qrcode.toBuffer(qrCodeData, {
+                scale: 8,
+                margin: 2
+            });
+
+            const attachment = new AttachmentBuilder(qrImage, { name: 'whatsapp-qr.png' });
+
+            const embed = new EmbedBuilder()
+                .setTitle('📱 WhatsApp Reconnection')
+                .setDescription('Scan this QR code with your WhatsApp mobile app:\n\n1. Open WhatsApp on your phone\n2. Tap Menu or Settings\n3. Tap Linked Devices\n4. Tap Link a Device\n5. Point your phone at this screen')
+                .setColor('#25D366')
+                .setImage('attachment://whatsapp-qr.png')
+                .setFooter({ text: 'QR code expires in 60 seconds' })
+                .setTimestamp();
+
+            return interaction.editReply({
+                embeds: [embed],
+                files: [attachment],
+                ephemeral: true
+            });
+        }
+
+        // If we get here, something went wrong
+        console.log(`[WhatsApp] Reconnect failed - no QR and not ready after ${attempts}s`);
+        return interaction.editReply({
+            content: `❌ Failed to reconnect after ${attempts}s. Check console logs for errors.\n\nTry deleting the \`.wwebjs_auth\` folder and restart the bot.`,
+            ephemeral: true
+        });
+
+    } catch (error) {
+        console.error('[WhatsApp] Reconnect error:', error);
+        isInitializing = false;
+        return interaction.editReply({
+            content: `❌ Reconnection failed: ${error.message}\n\nTry waiting a minute and then use \`/whatsapp connect\`.`,
+            ephemeral: true
+        });
+    }
+}
+
 // Helper function to send message with retry logic
 async function sendMessageWithRetry(formattedNumber, content, options = {}, maxRetries = 3) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -925,6 +1173,8 @@ module.exports = [
                     return handleCreateGroup(interaction);
                 case 'disconnect':
                     return handleWhatsAppDisconnect(interaction);
+                case 'reconnect':
+                    return handleWhatsAppReconnect(interaction);
                 default:
                     return interaction.reply({
                         content: '❌ Unknown subcommand.',

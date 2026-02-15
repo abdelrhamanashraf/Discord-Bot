@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeowBot Codenames</title>
+    <link rel="shortcut icon" href="https://meowboteow.sirv.com/meow%20images/favicon.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f0e17;
+            --bg-secondary: #1a1926;
+            --bg-card: rgba(30, 28, 50, 0.7);
+            --bg-glass: rgba(255, 255, 255, 0.04);
+            --accent: #7C3AED;
+            --accent-light: #a78bfa;
+            --accent-glow: rgba(124, 58, 237, 0.3);
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text-primary: #f0eef6;
+            --text-secondary: #8b8a95;
+            --text-muted: #5a5969;
+            --border: rgba(255, 255, 255, 0.06);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --team-a: #E63946;
+            --team-b: #457B9D;
+            --neutral-color: #E8E0D4;
+            --assassin-color: #1f2937;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body.rtl {
+            direction: rtl;
+            text-align: right;
+        }
+
+        /* Background effects */
+        .bg-effects {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-effects .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.12;
+        }
+
+        .bg-effects .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: var(--team-a);
+            top: -10%;
+            left: -10%;
+            animation: float1 20s ease-in-out infinite;
+        }
+
+        .bg-effects .orb-2 {
+            width: 400px;
+            height: 400px;
+            background: var(--team-b);
+            bottom: -10%;
+            right: -10%;
+            animation: float2 25s ease-in-out infinite;
+        }
+
+        @keyframes float1 {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(80px, 60px);
+            }
+        }
+
+        @keyframes float2 {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(-60px, -80px);
+            }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 16px 0 12px;
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--team-a), #fff, var(--team-b));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-top: 4px;
+        }
+
+        /* Phase containers */
+        .phase {
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+            flex: 1;
+        }
+
+        .phase.active {
+            display: flex;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            backdrop-filter: blur(20px);
+        }
+
+        .card-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-light);
+            margin-bottom: 12px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 24px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: all 0.25s ease;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7C3AED, #6d28d9);
+            color: #fff;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(124, 58, 237, 0.5);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: var(--bg-glass);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* ======= LOBBY PHASE ======= */
+        .lobby-config {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .lobby-config label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .lobby-config select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.8rem;
+            outline: none;
+        }
+
+        .color-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .color-swatch:hover,
+        .color-swatch.active {
+            border-color: #fff;
+            transform: scale(1.15);
+        }
+
+        .color-picker-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .teams-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .team-card {
+            border-radius: var(--radius);
+            padding: 16px;
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            backdrop-filter: blur(20px);
+            transition: border-color 0.3s;
+        }
+
+        .team-card .team-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .team-card .team-name {
+            font-size: 1rem;
+            font-weight: 800;
+        }
+
+        .team-card .color-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+        }
+
+        .role-section {
+            margin-bottom: 10px;
+        }
+
+        .role-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .role-slot {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            margin-bottom: 4px;
+            min-height: 40px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .role-slot:hover {
+            border-color: var(--accent);
+            background: rgba(124, 58, 237, 0.06);
+        }
+
+        .role-slot.occupied {
+            cursor: default;
+        }
+
+        .role-slot.occupied:hover {
+            border-color: var(--border);
+            background: var(--bg-glass);
+        }
+
+        .role-slot.mine {
+            border-color: var(--accent);
+            background: rgba(124, 58, 237, 0.1);
+        }
+
+        .role-slot .avatar-sm {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .role-slot .player-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .role-slot .empty-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .role-slot .role-icon {
+            font-size: 1rem;
+        }
+
+        .unassigned-section {
+            margin-top: 12px;
+        }
+
+        .unassigned-players {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .unassigned-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+
+        .unassigned-chip img {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+
+        .lobby-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .lobby-status {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .lobby-status.ready {
+            color: var(--success);
+        }
+
+        /* Share link */
+        .share-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 6px 10px;
+        }
+
+        .share-box input {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font);
+            font-size: 0.75rem;
+            outline: none;
+        }
+
+        .share-box .copy-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: var(--font);
+            font-weight: 600;
+            font-size: 0.7rem;
+        }
+
+        /* ======= GAME PHASE ======= */
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 260px;
+            gap: 16px;
+            flex: 1;
+        }
+
+        .game-main {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Turn indicator */
+        .turn-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .turn-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .turn-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .turn-text {
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        .score-display {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .score-team {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .score-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        /* Clue display */
+        .clue-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 10px 20px;
+            background: rgba(124, 58, 237, 0.1);
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .clue-word {
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .clue-number {
+            background: var(--accent);
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 800;
+        }
+
+        .guesses-left {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Spy clue input */
+        .spy-input-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 10px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+
+        .spy-input-bar input {
+            flex: 1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .spy-input-bar input:focus {
+            border-color: var(--accent);
+        }
+
+        .spy-input-bar select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        /* 5x5 Board */
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+        }
+
+        .board-card {
+            position: relative;
+            aspect-ratio: 2.6;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-weight: 800;
+            font-size: 1rem;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            border: 2px solid rgba(0, 0, 0, 0.08);
+            background: #E8E0D4;
+            color: #2C2520;
+            padding: 4px 2px;
+            word-break: break-word;
+            line-height: 1.15;
+            user-select: none;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .board-card:hover:not(.revealed):not(.disabled) {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+
+        .board-card:active:not(.revealed):not(.disabled) {
+            transform: translateY(0) scale(0.98);
+        }
+
+        .board-card.disabled {
+            cursor: default;
+            opacity: 0.85;
+        }
+
+        .board-card.revealed {
+            cursor: default;
+            color: #141313;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            background-size: cover;
+            background-position: center;
+            border: none;
+        }
+
+        .board-card.revealed.team_a {
+
+            border: 3px solid var(--team-a);
+            box-shadow: 0 2px 10px rgba(230, 57, 70, 0.4);
+        }
+
+        .board-card.revealed.team_b {
+            border: 3px solid var(--team-b);
+            box-shadow: 0 2px 10px rgba(69, 123, 157, 0.4);
+        }
+
+        .board-card.revealed.neutral {
+            background: var(--neutral-color);
+            opacity: 0.6;
+            box-shadow: none;
+        }
+
+        .board-card.revealed.assassin {
+            background: #1a1a2e;
+            border-color: #000;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+        }
+
+        .board-card.revealed.assassin::after {
+            content: '💀';
+            position: absolute;
+            top: 3px;
+            right: 5px;
+            font-size: 0.65rem;
+        }
+
+        /* Spy view — solid tinted fill colors so cards are clearly distinguishable */
+        .board-card.spy-view.team_a:not(.revealed) {
+            background: var(--team-a);
+            border-color: var(--team-a);
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 2px 8px rgba(230, 57, 70, 0.2), inset 0 0 20px rgba(230, 57, 70, 0.1);
+        }
+
+        .board-card.spy-view.team_b:not(.revealed) {
+            background: var(--team-b);
+            border-color: var(--team-b);
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 2px 8px rgba(69, 123, 157, 0.2), inset 0 0 20px rgba(69, 123, 157, 0.1);
+        }
+
+        .board-card.spy-view.neutral:not(.revealed) {
+            background: var(--neutral-color);
+            border-color: var(--neutral-color);
+            color: #3a3530;
+            text-shadow: none;
+        }
+
+        .board-card.spy-view.assassin:not(.revealed) {
+            background: rgba(15, 15, 30, 0.75);
+            border: 2px solid #000;
+            color: #ff4757;
+            text-shadow: 0 0 6px rgba(255, 71, 87, 0.5);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .board-card.spy-view.assassin:not(.revealed)::after {
+            content: '☠️';
+            position: absolute;
+            top: 3px;
+            right: 5px;
+            font-size: 0.55rem;
+        }
+
+        @keyframes cardReveal {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.06);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .board-card.just-revealed {
+            animation: cardReveal 0.4s ease;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Sidebar */
+        .game-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .game-log {
+            max-height: 300px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .game-log::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .game-log::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 2px;
+        }
+
+        .log-entry {
+            font-size: 0.72rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* Team roster in sidebar */
+        .sidebar-team {
+            margin-bottom: 8px;
+        }
+
+        .sidebar-team-header {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .sidebar-player {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 0;
+            font-size: 0.75rem;
+        }
+
+        .sidebar-player img {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+
+        .sidebar-player .role-badge {
+            font-size: 0.6rem;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        /* ======= RESULTS PHASE ======= */
+        .result-banner {
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .result-banner .trophy {
+            font-size: 3rem;
+            margin-bottom: 8px;
+        }
+
+        .result-banner h2 {
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
+
+        .result-banner .reason {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        .result-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            max-width: 650px;
+            margin: 0 auto;
+        }
+
+        .result-card {
+            position: relative;
+            aspect-ratio: 2.6;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-weight: 800;
+            font-size: 1rem;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            border: 2px solid rgba(0, 0, 0, 0.08);
+            background: #E8E0D4;
+            color: #2C2520;
+            padding: 4px 2px;
+            word-break: break-word;
+            line-height: 1.15;
+            user-select: none;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .result-card.team_a {
+            background: var(--team-a);
+        }
+
+        .result-card.team_b {
+            background: var(--team-b);
+        }
+
+        .result-card.neutral {
+            background: var(--neutral-color);
+            opacity: 0.7;
+        }
+
+        .result-card.assassin {
+            background: #1a1a2e;
+            border: 1px solid #000;
+        }
+
+        /* Status/Error */
+        .status-msg {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .status-msg .icon {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: var(--danger);
+            color: #fff;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 600;
+            z-index: 1000;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+            pointer-events: none;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .game-sidebar {
+                order: -1;
+            }
+        }
+
+        @media (max-width: 650px) {
+            .teams-container {
+                grid-template-columns: 1fr;
+            }
+
+            .board-card {
+                font-size: 0.6rem;
+                aspect-ratio: 1;
+            }
+
+            .board-grid {
+                gap: 4px;
+            }
+        }
+
+        /* ======= NAME PROMPT ======= */
+        .name-prompt-box {
+            max-width: 420px;
+            margin: 40px auto;
+            text-align: center;
+        }
+
+        .name-prompt-box .icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .name-prompt-box h2 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .name-prompt-box p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+        }
+
+        .name-prompt-box input {
+            width: 100%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 1rem;
+            outline: none;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+
+        .name-prompt-box input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .name-prompt-box input::placeholder {
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-effects">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <div class="container">
+        <div class="header" style="position:relative;">
+            <img src="images/spycat-removebg-preview.png" alt=""
+                style="position:absolute;left:-60px;top:-10px;width:80px;opacity:0.7;pointer-events:none;">
+            <h1>🕵️ Codenames</h1>
+            <p class="subtitle">Word Spy Game</p>
+            <img src="images/spycat1-removebg-preview.png" alt=""
+                style="position:absolute;right:-60px;top:-10px;width:80px;opacity:0.7;pointer-events:none;transform:scaleX(-1);">
+        </div>
+
+        <!-- Loading -->
+        <div id="loading-phase" class="phase active">
+            <div class="status-msg">
+                <div class="icon">🔄</div>
+                <h2>Connecting...</h2>
+                <p>Setting up your game session</p>
+            </div>
+        </div>
+
+        <!-- Name Prompt (for direct link guests) -->
+        <div id="name-prompt-phase" class="phase">
+            <div class="card name-prompt-box">
+                <div class="icon">🕵️</div>
+                <h2>Join Codenames Game</h2>
+                <p>Enter your display name to join the lobby</p>
+                <input type="text" id="guest-name-input" placeholder="Your name..." maxlength="20" autofocus>
+                <button class="btn btn-primary" id="guest-join-btn" style="width:100%;">🚀 Join Game</button>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div id="error-phase" class="phase">
+            <div class="status-msg">
+                <div class="icon">❌</div>
+                <h2 id="error-title">Error</h2>
+                <p id="error-message">Something went wrong.</p>
+            </div>
+        </div>
+
+        <!-- LOBBY -->
+        <div id="lobby-phase" class="phase">
+            <div class="card">
+                <div class="card-title">⚙️ Game Settings</div>
+                <div class="lobby-config">
+                    <label>Language</label>
+                    <select id="language-select">
+                        <option value="en">🇬🇧 English</option>
+                        <option value="ar">🇸🇦 Arabic</option>
+                    </select>
+                    <label style="margin-left:16px;">Team A Color</label>
+                    <div class="color-picker-row" id="color-picker-a"></div>
+                    <label style="margin-left:16px;">Team B Color</label>
+                    <div class="color-picker-row" id="color-picker-b"></div>
+                    <label style="margin-left:16px;">⏱️ Turn Timer</label>
+                    <select id="timer-select">
+                        <option value="0">No Timer</option>
+                        <option value="30">30 seconds</option>
+                        <option value="60">1 minute</option>
+                        <option value="90">1.5 minutes</option>
+                        <option value="120">2 minutes</option>
+                        <option value="180">3 minutes</option>
+                        <option value="300">5 minutes</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="teams-container">
+                <div class="team-card" id="team-a-card">
+                    <div class="team-header">
+                        <span class="team-name">Team A</span>
+                        <div class="color-indicator" id="team-a-indicator"></div>
+                    </div>
+                    <div class="role-section">
+                        <div class="role-title">🕵️ Spymaster</div>
+                        <div class="role-slot" id="slot-a-spy" data-team="a" data-role="spy">
+                            <span class="empty-text">Click to join as Spy</span>
+                        </div>
+                    </div>
+                    <div class="role-section">
+                        <div class="role-title">👥 Operatives</div>
+                        <div id="slots-a-operatives"></div>
+                        <div class="role-slot" id="slot-a-op-join" data-team="a" data-role="operative">
+                            <span class="empty-text">+ Join as Operative</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="team-card" id="team-b-card">
+                    <div class="team-header">
+                        <span class="team-name">Team B</span>
+                        <div class="color-indicator" id="team-b-indicator"></div>
+                    </div>
+                    <div class="role-section">
+                        <div class="role-title">🕵️ Spymaster</div>
+                        <div class="role-slot" id="slot-b-spy" data-team="b" data-role="spy">
+                            <span class="empty-text">Click to join as Spy</span>
+                        </div>
+                    </div>
+                    <div class="role-section">
+                        <div class="role-title">👥 Operatives</div>
+                        <div id="slots-b-operatives"></div>
+                        <div class="role-slot" id="slot-b-op-join" data-team="b" data-role="operative">
+                            <span class="empty-text">+ Join as Operative</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="unassigned-section" id="unassigned-section" style="display:none">
+                <div class="card">
+                    <div class="card-title">👤 Unassigned Players</div>
+                    <div class="unassigned-players" id="unassigned-list"></div>
+                </div>
+            </div>
+
+            <div class="lobby-actions">
+                <button class="btn btn-primary" id="start-btn" disabled>🚀 Start Game</button>
+            </div>
+            <div class="lobby-status" id="lobby-status">Waiting for players to pick teams and roles...</div>
+
+            <div class="share-box">
+                <input type="text" id="share-link" readonly>
+                <button class="copy-btn" onclick="copyLink()">Copy</button>
+            </div>
+        </div>
+
+        <!-- GAME -->
+        <div id="game-phase" class="phase">
+            <div class="game-layout">
+                <div class="game-main">
+                    <div class="turn-bar">
+                        <div class="turn-info">
+                            <div class="turn-dot" id="turn-dot"></div>
+                            <span class="turn-text" id="turn-text">Team A's Turn</span>
+                            <span id="phase-label" style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">—
+                                Spy giving clue</span>
+                            <span id="turn-timer-badge"
+                                style="display:none;margin-left:8px;padding:2px 10px;border-radius:20px;background:rgba(255,65,54,0.2);color:#ff4136;font-weight:800;font-size:0.85rem;letter-spacing:0.5px;">⏱
+                                60s</span>
+                        </div>
+                        <div class="score-display">
+                            <div class="score-team">
+                                <span class="score-badge" id="score-a-badge">0</span>
+                                <span id="score-a-label">A: 0/9</span>
+                            </div>
+                            <div class="score-team">
+                                <span class="score-badge" id="score-b-badge">0</span>
+                                <span id="score-b-label">B: 0/8</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clue display (shown when operatives are guessing) -->
+                    <div class="clue-bar" id="clue-bar" style="display:none;">
+                        <span>Clue:</span>
+                        <span class="clue-word" id="clue-word"></span>
+                        <span class="clue-number" id="clue-number"></span>
+                        <span class="guesses-left" id="guesses-left"></span>
+                    </div>
+
+                    <!-- Spy clue input (shown for spy during spy_clue phase) -->
+                    <div class="spy-input-bar" id="spy-input-bar" style="display:none;">
+                        <span style="font-size:0.8rem;font-weight:600;">🕵️ Your Clue:</span>
+                        <input type="text" id="clue-input" placeholder="Enter a one-word clue..." maxlength="30">
+                        <select id="clue-count">
+                            <option value="1">1</option>
+                            <option value="2" selected>2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                        </select>
+                        <button class="btn btn-primary" id="send-clue-btn" style="padding:8px 16px;">Send</button>
+                    </div>
+
+                    <!-- End turn button (for operatives during guess phase) -->
+                    <div id="end-turn-bar" style="display:none;text-align:center;">
+                        <button class="btn btn-secondary" id="end-turn-btn">⏭️ End Turn</button>
+                    </div>
+
+                    <!-- 5x5 Board -->
+                    <div class="board-grid" id="board-grid"></div>
+                </div>
+
+                <div class="game-sidebar">
+                    <div class="card">
+                        <div class="card-title">👥 Teams</div>
+                        <div id="sidebar-teams"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📜 Game Log</div>
+                        <div class="game-log" id="game-log"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTS -->
+        <div id="results-phase" class="phase">
+            <div class="card">
+                <div class="result-banner" id="result-banner">
+                    <div class="trophy">🏆</div>
+                    <h2 id="result-title">Team A Wins!</h2>
+                    <p class="reason" id="result-reason"></p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">🗺️ Full Board</div>
+                <div class="result-board" id="result-board"></div>
+            </div>
+            <div style="text-align:center;margin-top:12px;display:flex;gap:10px;justify-content:center;">
+                <button class="btn btn-primary" id="cn-btn-new-game" style="display:none;"
+                    onclick="restartCodenamesGame()">🔁 New Game</button>
+                <button class="btn btn-secondary" onclick="location.reload()">🚪 Leave</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spectator Overlay / Controls (in game phase) -->
+    <div id="spectator-controls"
+        style="display:none; position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--bg-card); padding:10px 20px; border-radius:30px; border:1px solid var(--border); z-index:100; gap:10px; box-shadow:0 5px 20px rgba(0,0,0,0.5);">
+        <span style="align-self:center; margin-right:5px; font-weight:600;">Join Game:</span>
+        <button id="btn-join-a" class="btn" style="padding:6px 12px; color:white; border:none;"
+            onclick="joinTeam('a', 'operative')">Team A</button>
+        <button id="btn-join-b" class="btn" style="padding:6px 12px; color:white; border:none;"
+            onclick="joinTeam('b', 'operative')">Team B</button>
+    </div>
+    </div>
+
+    <script>
+        // ============ INIT ============
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('id');
+        let myDiscordId = params.get('odiscordId');
+        let myUsername = params.get('username');
+        let myDisplayName = params.get('displayName');
+        let myAvatarUrl = params.get('avatarUrl');
+        let images = ['spycat2', 'spycat3', 'spycat4', 'spycat5', 'spycat6'];
+        const TEAM_COLORS = [
+            '#E63946', '#D62828', '#F77F00', '#FCBF49',
+            '#2A9D8F', '#264653', '#457B9D', '#1D3557',
+            '#6A0572', '#AB83A1', '#3A86FF', '#8338EC'
+        ];
+
+        let lobbyState = null;
+        let gameState = null;
+        let myTeam = null;
+        let myRole = null;
+        let isHost = false;
+        let isGuest = false;
+
+        // Default avatar for guests
+        const DEFAULT_AVATAR = 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+        // Connect to /codenames namespace
+        const socket = io('/codenames');
+
+        // Determine initial phase
+        if (!sessionId) {
+            showError('Missing session ID. Use a valid game link.');
+        } else if (!myDiscordId) {
+            // Direct link — show name prompt (socket connects in background)
+            isGuest = true;
+            showPhase('name-prompt');
+        }
+        // else: Discord user — socket will auto-join via the connect handler below
+
+        function emitJoin() {
+            socket.emit('cn-join-game', {
+                sessionId,
+                odiscordId: myDiscordId,
+                username: myUsername,
+                displayName: myDisplayName,
+                avatarUrl: myAvatarUrl
+            });
+        }
+
+        // When socket connects, auto-join if we have identity (Discord users)
+        socket.on('connect', () => {
+            console.log('Connected to codenames server');
+            if (myDiscordId && sessionId) {
+                emitJoin();
+            }
+        });
+
+        // Guest name prompt handlers
+        document.getElementById('guest-join-btn').addEventListener('click', submitGuestName);
+        document.getElementById('guest-name-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitGuestName();
+        });
+
+        function submitGuestName() {
+            const name = document.getElementById('guest-name-input').value.trim();
+            if (!name) {
+                showToast('Please enter a name.');
+                return;
+            }
+            myDiscordId = 'guest_' + Math.random().toString(36).substring(2, 10);
+            myUsername = name;
+            myDisplayName = name;
+            myAvatarUrl = DEFAULT_AVATAR;
+            showPhase('loading');
+            // Socket is already connected by now, just emit join directly
+            emitJoin();
+        }
+
+        socket.on('cn-error', (data) => {
+            showToast(data.message);
+        });
+
+        socket.on('cn-lobby-update', (data) => {
+            lobbyState = data;
+            isHost = data.host.odiscordId === myDiscordId;
+            updateMyInfo(data);
+            renderLobby(data);
+
+            // Only force lobby phase if the game is actually in lobby state
+            // If playing/finished, we expect cn-game-started or cn-game-over to handle the phase
+            if (data.state === 'lobby') {
+                showPhase('lobby');
+            }
+        });
+
+        socket.on('cn-game-started', (data) => {
+            gameState = data;
+            renderGame(data);
+            showPhase('game');
+        });
+
+        socket.on('cn-clue-given', (data) => {
+            gameState = data;
+            renderGame(data);
+        });
+
+        socket.on('cn-card-revealed', (data) => {
+            gameState = data;
+            renderGame(data);
+
+            // Highlight the just-revealed card
+            if (data.revealedCard) {
+                const cardEl = document.querySelector(`[data-index="${data.revealedCard.index}"]`);
+                if (cardEl) {
+                    cardEl.classList.add('just-revealed');
+                    setTimeout(() => cardEl.classList.remove('just-revealed'), 600);
+                }
+            }
+        });
+
+        socket.on('cn-turn-changed', (data) => {
+            gameState = data;
+            renderGame(data);
+        });
+
+        socket.on('cn-game-over', (data) => {
+            renderResults(data);
+            showPhase('results');
+            // Show New Game button if host
+            if (isHost) {
+                document.getElementById('cn-btn-new-game').style.display = '';
+            }
+        });
+
+        socket.on('cn-game-restarted', (data) => {
+            // Server reset into lobby — return to lobby phase
+            renderLobby(data);
+            showPhase('lobby');
+            // Hide New Game button
+            document.getElementById('cn-btn-new-game').style.display = 'none';
+            showToast('Host started a new game! Back to lobby.');
+        });
+
+        socket.on('cn-game-destroyed', (data) => {
+            showError(data.reason || 'Game was destroyed.');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+        });
+
+        // Timer countdown
+        socket.on('cn-timer-tick', ({ remaining }) => {
+            const badge = document.getElementById('turn-timer-badge');
+            if (remaining > 0) {
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                badge.textContent = `⏱ ${mins > 0 ? mins + ':' + String(secs).padStart(2, '0') : secs + 's'}`;
+                badge.style.display = 'inline-block';
+                if (remaining <= 10) {
+                    badge.style.background = 'rgba(255,65,54,0.35)';
+                    badge.style.animation = 'pulse 0.5s ease infinite';
+                } else {
+                    badge.style.background = 'rgba(255,65,54,0.2)';
+                    badge.style.animation = 'none';
+                }
+            } else {
+                badge.style.display = 'none';
+                badge.style.animation = 'none';
+            }
+        });
+
+        // ============ HELPERS ============
+
+        function showPhase(phase) {
+            document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${phase}-phase`).classList.add('active');
+        }
+
+        function showError(msg) {
+            document.getElementById('error-message').textContent = msg;
+            showPhase('error');
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function updateMyInfo(data) {
+            const me = data.players.find(p => p.odiscordId === myDiscordId);
+            if (me) {
+                myTeam = me.team;
+                myRole = me.role;
+            } else {
+                // Not in player list (shouldn't happen if joined)
+                myTeam = null;
+                myRole = null;
+            }
+        }
+
+        function copyLink() {
+            const input = document.getElementById('share-link');
+            input.select();
+            navigator.clipboard.writeText(input.value).then(() => {
+                const btn = input.nextElementSibling;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            });
+        }
+
+        // ============ LOBBY RENDERING ============
+
+        function renderLobby(data) {
+            // Update language
+            const langSelect = document.getElementById('language-select');
+            langSelect.value = data.language;
+            langSelect.disabled = !isHost;
+
+            // RTL for Arabic
+            document.body.classList.toggle('rtl', data.language === 'ar');
+
+            // Update colors
+            document.documentElement.style.setProperty('--team-a', data.teams.a.color);
+            document.documentElement.style.setProperty('--team-b', data.teams.b.color);
+            document.getElementById('team-a-indicator').style.background = data.teams.a.color;
+            document.getElementById('team-b-indicator').style.background = data.teams.b.color;
+            document.getElementById('team-a-card').style.borderColor = data.teams.a.color + '40';
+            document.getElementById('team-b-card').style.borderColor = data.teams.b.color + '40';
+
+            // Color pickers
+            renderColorPicker('color-picker-a', 'a', data.teams.a.color);
+            renderColorPicker('color-picker-b', 'b', data.teams.b.color);
+
+            // Timer
+            const timerSelect = document.getElementById('timer-select');
+            timerSelect.value = data.turnTimer || 0;
+            timerSelect.disabled = !isHost;
+
+            // Team A slots
+            renderTeamSlots(data, 'a');
+            renderTeamSlots(data, 'b');
+
+            // Unassigned players
+            const unassigned = data.players.filter(p => !p.team);
+            const section = document.getElementById('unassigned-section');
+            const list = document.getElementById('unassigned-list');
+            if (unassigned.length > 0) {
+                section.style.display = 'block';
+                list.innerHTML = unassigned.map(p =>
+                    `<div class="unassigned-chip">
+                        <img src="${p.avatarUrl}" alt="">
+                        <span>${p.displayName}</span>
+                    </div>`
+                ).join('');
+            } else {
+                section.style.display = 'none';
+            }
+
+            // Start button
+            const startBtn = document.getElementById('start-btn');
+            const teamAReady = data.players.some(p => p.team === 'a' && p.role === 'spy') &&
+                data.players.some(p => p.team === 'a' && p.role === 'operative');
+            const teamBReady = data.players.some(p => p.team === 'b' && p.role === 'spy') &&
+                data.players.some(p => p.team === 'b' && p.role === 'operative');
+
+            startBtn.disabled = !isHost || !teamAReady || !teamBReady;
+            startBtn.style.display = isHost ? '' : 'none';
+
+            const statusEl = document.getElementById('lobby-status');
+            if (!teamAReady || !teamBReady) {
+                statusEl.textContent = 'Each team needs at least 1 Spy + 1 Operative to start.';
+                statusEl.className = 'lobby-status';
+            } else if (!isHost) {
+                statusEl.textContent = 'Waiting for the host to start the game...';
+                statusEl.className = 'lobby-status';
+            } else {
+                statusEl.textContent = 'Ready to start! 🚀';
+                statusEl.className = 'lobby-status ready';
+            }
+
+            // Share link
+            document.getElementById('share-link').value = window.location.href.split('?')[0] + '?id=' + sessionId;
+        }
+
+        function renderColorPicker(containerId, team, activeColor) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = TEAM_COLORS.map(color =>
+                `<div class="color-swatch ${color === activeColor ? 'active' : ''}" 
+                      style="background:${color}" 
+                      onclick="pickColor('${team}', '${color}')"
+                      ${!isHost ? 'style="pointer-events:none;opacity:0.5"' : ''}></div>`
+            ).join('');
+        }
+
+        function pickColor(team, color) {
+            if (!isHost) return;
+            socket.emit('cn-update-color', { sessionId, team, color });
+        }
+
+        function renderTeamSlots(data, team) {
+            const spy = data.players.find(p => p.team === team && p.role === 'spy');
+            const operatives = data.players.filter(p => p.team === team && p.role === 'operative');
+
+            // Spy slot
+            const spySlot = document.getElementById(`slot-${team}-spy`);
+            if (spy) {
+                const isMine = spy.odiscordId === myDiscordId;
+                spySlot.className = `role-slot occupied ${isMine ? 'mine' : ''}`;
+                spySlot.innerHTML = `
+                    <span class="role-icon">🕵️</span>
+                    <img class="avatar-sm" src="${spy.avatarUrl}" alt="">
+                    <span class="player-name">${spy.displayName}</span>
+                    ${!spy.connected ? '<span style="color:var(--danger);font-size:0.6rem;">●</span>' : ''}
+                `;
+                spySlot.onclick = isMine ? () => leaveRole() : null;
+            } else {
+                spySlot.className = 'role-slot';
+                spySlot.innerHTML = '<span class="empty-text">Click to join as Spy</span>';
+                spySlot.onclick = () => joinTeam(team, 'spy');
+            }
+
+            // Operative slots
+            const opsContainer = document.getElementById(`slots-${team}-operatives`);
+            opsContainer.innerHTML = operatives.map(p => {
+                const isMine = p.odiscordId === myDiscordId;
+                return `<div class="role-slot occupied ${isMine ? 'mine' : ''}" onclick="${isMine ? 'leaveRole()' : ''}">
+                    <span class="role-icon">👤</span>
+                    <img class="avatar-sm" src="${p.avatarUrl}" alt="">
+                    <span class="player-name">${p.displayName}</span>
+                    ${!p.connected ? '<span style="color:var(--danger);font-size:0.6rem;">●</span>' : ''}
+                </div>`;
+            }).join('');
+
+            // Join as operative button
+            const joinBtn = document.getElementById(`slot-${team}-op-join`);
+            const alreadyOp = operatives.some(p => p.odiscordId === myDiscordId);
+            joinBtn.style.display = alreadyOp ? 'none' : '';
+            joinBtn.onclick = () => joinTeam(team, 'operative');
+        }
+
+        function joinTeam(team, role) {
+            socket.emit('cn-update-team', { sessionId, team, role });
+        }
+
+        function leaveRole() {
+            socket.emit('cn-update-team', { sessionId, team: null, role: null });
+        }
+
+        // Language change
+        document.getElementById('language-select').addEventListener('change', (e) => {
+            if (!isHost) return;
+            socket.emit('cn-update-language', { sessionId, language: e.target.value });
+        });
+
+        // Timer change
+        document.getElementById('timer-select').addEventListener('change', (e) => {
+            if (!isHost) return;
+            socket.emit('cn-update-timer', { sessionId, timer: parseInt(e.target.value) });
+        });
+
+        // Start game
+        document.getElementById('start-btn').addEventListener('click', () => {
+            socket.emit('cn-start-game', { sessionId });
+        });
+
+        // ============ GAME RENDERING ============
+
+        // Images for revealed cards — each card gets a random one
+        const CARD_IMAGES = [
+            'spycat2.jpg', 'spycat3.jpg', 'spycat4.jpg', 'spycat5.jpg', 'spycat6.jpg'
+        ];
+
+        // Assign a random image per card index (consistent across re-renders)
+        const cardImageMap = {};
+        function getCardImage(index) {
+            if (!(index in cardImageMap)) {
+                cardImageMap[index] = CARD_IMAGES[Math.floor(Math.random() * CARD_IMAGES.length)];
+            }
+            return cardImageMap[index];
+        }
+
+        function renderGame(state) {
+            const { board, currentTurn, currentPhase, currentClue, guessesRemaining, score, target, teams, gameLog, startingTeam } = state;
+
+            // Update colors
+            document.documentElement.style.setProperty('--team-a', teams.a.color);
+            document.documentElement.style.setProperty('--team-b', teams.b.color);
+
+            // Turn indicator
+            const turnColor = currentTurn === 'a' ? teams.a.color : teams.b.color;
+            document.getElementById('turn-dot').style.background = turnColor;
+            document.getElementById('turn-text').textContent = `Team ${currentTurn.toUpperCase()}'s Turn`;
+
+            const phaseLabel = document.getElementById('phase-label');
+            if (currentPhase === 'spy_clue') {
+                phaseLabel.textContent = '— Spymaster giving clue';
+            } else {
+                phaseLabel.textContent = '— Operatives guessing';
+            }
+
+            // Scores
+            document.getElementById('score-a-badge').textContent = score.a;
+            document.getElementById('score-a-badge').style.background = teams.a.color;
+            document.getElementById('score-a-label').textContent = `A: ${score.a}/${target.a}`;
+
+            document.getElementById('score-b-badge').textContent = score.b;
+            document.getElementById('score-b-badge').style.background = teams.b.color;
+            document.getElementById('score-b-label').textContent = `B: ${score.b}/${target.b}`;
+
+            // Clue bar
+            const clueBar = document.getElementById('clue-bar');
+            if (currentClue && currentPhase === 'operative_guess') {
+                clueBar.style.display = 'flex';
+                document.getElementById('clue-word').textContent = currentClue.word;
+                document.getElementById('clue-number').textContent = currentClue.number;
+                document.getElementById('guesses-left').textContent = `(${guessesRemaining} guesses left)`;
+            } else {
+                clueBar.style.display = 'none';
+            }
+
+            // Spy input
+            const spyBar = document.getElementById('spy-input-bar');
+            const isMyTurnAsSpy = myRole === 'spy' && myTeam === currentTurn && currentPhase === 'spy_clue';
+            spyBar.style.display = isMyTurnAsSpy ? 'flex' : 'none';
+
+            // Hide timer badge during spy_clue (server doesn't tick during clue phase)
+            if (currentPhase === 'spy_clue') {
+                document.getElementById('turn-timer-badge').style.display = 'none';
+            }
+
+            // End turn button — ONLY for operatives on current team
+            const endTurnBar = document.getElementById('end-turn-bar');
+            const canEndTurn = myRole === 'operative' && myTeam === currentTurn && currentPhase === 'operative_guess';
+            endTurnBar.style.display = canEndTurn ? 'block' : 'none';
+
+            // Board
+            const canGuess = myRole === 'operative' && myTeam === currentTurn && currentPhase === 'operative_guess' && guessesRemaining > 0;
+
+            // Spectator Controls (Join Buttons)
+            const spectatorControls = document.getElementById('spectator-controls');
+            if (!myRole && currentPhase !== 'game_over') {
+                spectatorControls.style.display = 'flex';
+                // Update join buttons based on team colors
+                document.getElementById('btn-join-a').style.backgroundColor = teams.a.color;
+                document.getElementById('btn-join-b').style.backgroundColor = teams.b.color;
+            } else {
+                spectatorControls.style.display = 'none';
+            }
+
+            const grid = document.getElementById('board-grid');
+            grid.innerHTML = board.map((card, i) => {
+                const revealed = card.revealed;
+                const typeClass = card.type !== 'hidden' ? card.type : '';
+                const spyClass = (myRole === 'spy' && !revealed && card.type !== 'hidden') ? 'spy-view' : '';
+                const disabledClass = (!canGuess || revealed) ? 'disabled' : '';
+                const revealedClass = revealed ? 'revealed' : '';
+                const imgStyle = revealed ? `background-image:url(images/${getCardImage(i)});
+                 background-size: cover;
+                 background-position: center;` : '';
+
+                return `<div class="board-card ${revealedClass} ${typeClass} ${spyClass} ${disabledClass}" 
+                             data-index="${i}" style="${imgStyle}"
+                             onclick="guessCard(${i})">${card.word}</div>`;
+            }).join('');
+
+            // Sidebar teams
+            renderSidebarTeams(state);
+
+            // Game log
+            const logContainer = document.getElementById('game-log');
+            logContainer.innerHTML = gameLog.map(entry =>
+                `<div class="log-entry">${entry.message}</div>`
+            ).join('');
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function renderSidebarTeams(state) {
+            const container = document.getElementById('sidebar-teams');
+            if (!lobbyState) return;
+
+            let html = '';
+            ['a', 'b'].forEach(team => {
+                const color = state.teams[team].color;
+                const players = lobbyState.players.filter(p => p.team === team);
+
+                html += `<div class="sidebar-team">
+                    <div class="sidebar-team-header" style="color:${color}">Team ${team.toUpperCase()}</div>`;
+
+                players.forEach(p => {
+                    html += `<div class="sidebar-player">
+                        <img src="${p.avatarUrl}" alt="">
+                        <span>${p.displayName}</span>
+                        <span class="role-badge" style="background:${color}">${p.role === 'spy' ? 'SPY' : 'OP'}</span>
+                    </div>`;
+                });
+
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        // ============ GAME ACTIONS ============
+
+        function guessCard(index) {
+            if (!gameState) return;
+            const card = gameState.board[index];
+            if (!card || card.revealed) return;
+            if (myRole !== 'operative' || myTeam !== gameState.currentTurn) return;
+            if (gameState.currentPhase !== 'operative_guess' || gameState.guessesRemaining <= 0) return;
+
+            socket.emit('cn-operative-guess', { sessionId, cardIndex: index });
+        }
+
+        document.getElementById('send-clue-btn').addEventListener('click', () => {
+            const word = document.getElementById('clue-input').value.trim();
+            const number = parseInt(document.getElementById('clue-count').value);
+
+            if (!word) {
+                showToast('Please enter a clue word.');
+                return;
+            }
+
+            socket.emit('cn-spy-clue', { sessionId, word, number });
+            document.getElementById('clue-input').value = '';
+        });
+
+        // Enter key sends clue
+        document.getElementById('clue-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('send-clue-btn').click();
+            }
+        });
+
+        document.getElementById('end-turn-btn').addEventListener('click', () => {
+            socket.emit('cn-end-turn', { sessionId });
+        });
+
+        // ============ RESULTS ============
+
+        function renderResults(data) {
+            const { winner, reason, board, score, target } = data;
+
+            const title = document.getElementById('result-title');
+            const reasonEl = document.getElementById('result-reason');
+
+            if (winner) {
+                title.textContent = `🏆 Team ${winner.toUpperCase()} Wins!`;
+                title.style.color = winner === 'a'
+                    ? document.documentElement.style.getPropertyValue('--team-a')
+                    : document.documentElement.style.getPropertyValue('--team-b');
+            } else {
+                title.textContent = 'Game Over';
+            }
+            reasonEl.textContent = reason;
+
+            // Result board
+            const resultBoard = document.getElementById('result-board');
+            resultBoard.innerHTML = board.map(card =>
+                `<div class="result-card ${card.type}">${card.word}</div>`
+            ).join('');
+        }
+
+        function restartCodenamesGame() {
+            if (socket) {
+                socket.emit('cn-restart-game', { sessionId });
+            }
+        }
+    </script>
+</body>
+
+</html>

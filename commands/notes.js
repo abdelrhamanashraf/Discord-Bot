@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -6,18 +6,17 @@ const dataDir = path.join(__dirname, '../data');
 const notesFile = path.join(dataDir, 'notes.json');
 const defaultThumbnail = 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png';
 const imageLIST = [
-'https://cdn.discordapp.com/attachments/1435289217122041937/1435289449708912680/saved2.png?ex=690b6cf7&is=690a1b77&hm=79bb4e6cc0121d310deafe29d062934038fe218caa8cfb62ce0514fc30c82426&',
-'https://cdn.discordapp.com/attachments/1435289217122041937/1435289451667394560/saved1.png?ex=690b6cf7&is=690a1b77&hm=20b527b756c5435d57b76c686f7046a36fe0d768d2a18cab6b6368e907d74608&',
-'https://cdn.discordapp.com/attachments/1435289217122041937/1435289450304372746/saved3.png?ex=690b6cf7&is=690a1b77&hm=4c37438d9c28e5f3eb97904c22218c308af02361bdea0c75969d9e0a787c8c94&',
+    'https://cdn.discordapp.com/attachments/1435289217122041937/1435289449708912680/saved2.png?ex=690b6cf7&is=690a1b77&hm=79bb4e6cc0121d310deafe29d062934038fe218caa8cfb62ce0514fc30c82426&',
+    'https://cdn.discordapp.com/attachments/1435289217122041937/1435289451667394560/saved1.png?ex=690b6cf7&is=690a1b77&hm=20b527b756c5435d57b76c686f7046a36fe0d768d2a18cab6b6368e907d74608&',
+    'https://cdn.discordapp.com/attachments/1435289217122041937/1435289450304372746/saved3.png?ex=690b6cf7&is=690a1b77&hm=4c37438d9c28e5f3eb97904c22218c308af02361bdea0c75969d9e0a787c8c94&',
 ];
-// Function to get a random image from the list
 const getRandomImage = () => imageLIST[Math.floor(Math.random() * imageLIST.length)];
 
-// Initialize or load notes
+// ── Data helpers ──────────────────────────────────────────────
 let notes = {};
 try {
     notes = JSON.parse(fs.readFileSync(notesFile, 'utf8'));
-} catch (error) {
+} catch {
     notes = {};
     fs.writeFileSync(notesFile, JSON.stringify(notes, null, 2));
 }
@@ -32,415 +31,339 @@ function createNoteId(userId, title) {
 
 function getUserNotes(userId) {
     return Object.entries(notes)
-        .filter(([noteId, note]) => note.userId === userId)
-        .map(([noteId, note]) => ({
-            id: noteId,
-            ...note
-        }));
+        .filter(([, note]) => note.userId === userId)
+        .map(([noteId, note]) => ({ id: noteId, ...note }));
 }
 
-async function handleNoteCommand(interaction) {
-    const title = interaction.options.getString('title');
-    const content = interaction.options.getString('content');
-    const saveToChannel = interaction.options.getBoolean('save_to_channel') || false;
-
-    const noteId = createNoteId(interaction.user.id, title);
-    notes[noteId] = {
-        title,
-        content,
-        userId: interaction.user.id,
-        createdAt: new Date().toISOString(),
-        author: interaction.user.username
-    };
-
-    saveNotes();
-
-    if (saveToChannel) {
-        const noteEmbed = new EmbedBuilder()
-            .setTitle('📝 Note Saved')
-            .setDescription(`**${title}**\n\n${content}`)
-            .setColor('#2ECC71')
-            .setThumbnail(getRandomImage() || defaultThumbnail)
-            .setFooter({ text: `Note created by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
-            .setTimestamp();
-
-        await interaction.channel.send({ embeds: [noteEmbed] });
-    }
-
-    const savinnotes = new EmbedBuilder()
-        .setTitle('📝 Note Saved')
-        .setDescription(`Your note "${title}" has been saved!`)
+// ── Embed builders ───────────────────────────────────────────
+function buildMainEmbed(userNotes, user) {
+    const embed = new EmbedBuilder()
+        .setTitle('📝 My Notes')
         .setColor('#2ECC71')
         .setThumbnail(getRandomImage() || defaultThumbnail)
-        .setFooter({ text: `Saved by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+        .setFooter({ text: `${user.username}'s notebook`, iconURL: user.displayAvatarURL() })
         .setTimestamp();
 
-    await interaction.reply({ embeds: [savinnotes], ephemeral: true });
-}
-
-async function handleGetNotesCommand(interaction) {
-    const userNotes = getUserNotes(interaction.user.id);
-
     if (userNotes.length === 0) {
-        return interaction.reply({ content: 'You have no saved notes!', ephemeral: true });
+        embed.setDescription('You don\'t have any notes yet.\nClick **➕ Add Note** to create your first one!');
+    } else {
+        const list = userNotes.map((n, i) => {
+            const preview = n.content.length > 60 ? n.content.substring(0, 60) + '…' : n.content;
+            return `**${i + 1}.** ${n.title}\n> ${preview}`;
+        }).join('\n\n');
+        embed.setDescription(`You have **${userNotes.length}** note${userNotes.length > 1 ? 's' : ''}:\n\n${list}`);
     }
 
-    const notesPerPage = 5;
-    const pages = Math.ceil(userNotes.length / notesPerPage);
-    let currentPage = 0;
-
-    const getNotesEmbed = (page) => {
-        const start = page * notesPerPage;
-        const end = start + notesPerPage;
-        const pageNotes = userNotes.slice(start, end);
-
-        const embed = new EmbedBuilder()
-            .setTitle('📝 Your Notes')
-            .setColor('#2ECC71')
-            .setThumbnail(getRandomImage() || defaultThumbnail)
-            .setFooter({ text: `Page ${page + 1}/${pages} • Total Notes: ${userNotes.length}`, iconURL: interaction.user.displayAvatarURL() })
-            .setTimestamp();
-
-        pageNotes.forEach(note => {
-            embed.addFields({ name: note.title, value: note.content });
-        });
-
-        return embed;
-    };
-
-    const navigationRow = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId('prev_page')
-                .setLabel('◀️ Previous')
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(true),
-            new ButtonBuilder()
-                .setCustomId('next_page')
-                .setLabel('Next ▶️')
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(pages <= 1)
-        );
-
-    const message = await interaction.reply({ 
-        embeds: [getNotesEmbed(currentPage)], 
-        components: [navigationRow],
-        ephemeral: true 
-    });
-
-    const collector = message.createMessageComponentCollector({ time: 300000 });
-
-    collector.on('collect', async (i) => {
-        if (i.user.id !== interaction.user.id) {
-            return i.reply({ content: 'This interaction is not for you!', ephemeral: true });
-        }
-
-        if (i.customId === 'prev_page' && currentPage > 0) {
-            currentPage--;
-        } else if (i.customId === 'next_page' && currentPage < pages - 1) {
-            currentPage++;
-        }
-
-        navigationRow.components[0].setDisabled(currentPage === 0);
-        navigationRow.components[1].setDisabled(currentPage === pages - 1);
-
-        await i.update({ embeds: [getNotesEmbed(currentPage)], components: [navigationRow] });
-    });
-
-    collector.on('end', () => {
-        navigationRow.components.forEach(button => button.setDisabled(true));
-        interaction.editReply({ components: [navigationRow] }).catch(console.error);
-    });
+    return embed;
 }
 
-async function handleGetNoteCommand(interaction) {
-    const title = interaction.options.getString('title');
-    const noteId = createNoteId(interaction.user.id, title);
-    const note = notes[noteId];
-
-    if (!note) {
-        return interaction.reply({ content: 'Note not found!', ephemeral: true });
-    }
-
-    const embed = new EmbedBuilder()
-        .setTitle('📝 Note Details')
-        .setDescription(`**${note.title}**\n\n${note.content}`)
+function buildNoteDetailEmbed(note, user) {
+    return new EmbedBuilder()
+        .setTitle(`📝 ${note.title}`)
+        .setDescription(note.content)
         .setColor('#2ECC71')
         .setThumbnail(getRandomImage() || defaultThumbnail)
         .addFields(
-            { name: 'Created At', value: new Date(note.createdAt).toLocaleString(), inline: true },
+            { name: 'Created', value: new Date(note.createdAt).toLocaleString(), inline: true },
             { name: 'Author', value: note.author, inline: true }
         )
-        .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+        .setFooter({ text: `Requested by ${user.username}`, iconURL: user.displayAvatarURL() })
         .setTimestamp();
+}
 
-    const actionRow = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId(`save_note_${noteId}`)
-                .setLabel('Save to Channel')
-                .setStyle(ButtonStyle.Success)
-                .setEmoji('📌'),
-            new ButtonBuilder()
-                .setCustomId(`edit_note_${noteId}`)
-                .setLabel('Edit')
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji('✏️'),
-            new ButtonBuilder()
-                .setCustomId(`delete_note_${noteId}`)
-                .setLabel('Delete')
-                .setStyle(ButtonStyle.Danger)
-                .setEmoji('🗑️')
+// ── Component builders ───────────────────────────────────────
+function buildMainButtons() {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('notes_add')
+            .setLabel('Add Note')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('➕'),
+        new ButtonBuilder()
+            .setCustomId('notes_manage')
+            .setLabel('Manage Notes')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('📋')
+    );
+}
+
+function buildNoteActionRow(noteId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`notes_save_${noteId}`)
+            .setLabel('Save to Channel')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('📌'),
+        new ButtonBuilder()
+            .setCustomId(`notes_edit_${noteId}`)
+            .setLabel('Edit')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('✏️'),
+        new ButtonBuilder()
+            .setCustomId(`notes_delete_${noteId}`)
+            .setLabel('Delete')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('🗑️'),
+        new ButtonBuilder()
+            .setCustomId('notes_back')
+            .setLabel('Back')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('◀️')
+    );
+}
+
+function buildManageSelectMenu(userNotes) {
+    const menu = new StringSelectMenuBuilder()
+        .setCustomId('notes_select')
+        .setPlaceholder('Select a note to manage…')
+        .addOptions(
+            userNotes.slice(0, 25).map(n =>
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(n.title.substring(0, 100))
+                    .setDescription(n.content.substring(0, 100))
+                    .setValue(n.id)
+            )
+        );
+    return new ActionRowBuilder().addComponents(menu);
+}
+
+// ── Core command ─────────────────────────────────────────────
+async function execute(interaction) {
+    const userNotes = getUserNotes(interaction.user.id);
+    const embed = buildMainEmbed(userNotes, interaction.user);
+    const buttons = buildMainButtons();
+
+    await interaction.reply({ embeds: [embed], components: [buttons], ephemeral: true });
+}
+
+// ── Button handler ───────────────────────────────────────────
+async function handleButton(interaction) {
+    const id = interaction.customId;
+
+    // ── Add Note ──
+    if (id === 'notes_add') {
+        const modal = new ModalBuilder()
+            .setCustomId('notes_add_modal')
+            .setTitle('Create a New Note');
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('title')
+                    .setLabel('Title')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+                    .setMaxLength(100)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('content')
+                    .setLabel('Content')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(true)
+                    .setMaxLength(4000)
+            )
         );
 
-    await interaction.reply({ embeds: [embed], components: [actionRow], ephemeral: true });
-}
+        return interaction.showModal(modal);
+    }
 
-// Add this new function after the handleGetNoteCommand function
-async function handleNoteButtons(interaction) {
-    const customId = interaction.customId;
-    console.log(`Handling note button: ${customId}`);
-    
-    // Handle different button actions based on customId format with underscores
-    if (customId.startsWith('save_note_')) {
-        const noteId = customId.replace('save_note_', '');
-        return handleSaveToChannel(interaction, noteId);
-    } 
-    else if (customId.startsWith('edit_note_')) {
-        const noteId = customId.replace('edit_note_', '');
-        return handleEditNote(interaction, noteId);
-    }
-    else if (customId.startsWith('delete_note_')) {
-        const noteId = customId.replace('delete_note_', '');
-        return handleDeleteNote(interaction, noteId);
-    }
-    else if (customId.startsWith('confirm_delete_')) {
-        const noteId = customId.replace('confirm_delete_', '');
-        return confirmDeleteNote(interaction, noteId);
-    }
-    else if (customId === 'cancel_delete') {
-        return interaction.update({ 
-            content: 'Delete operation cancelled.', 
-            components: [] 
-        });
-    }
-    
-    // Legacy format handling with colons (for backward compatibility)
-    if (customId.includes(':')) {
-        const [action, noteId] = customId.split(':');
-        
-        console.log(`Handling button with colon format: ${action} for note: ${noteId}`);
-        
-        if (action === 'save_note') {
-            return handleSaveToChannel(interaction, noteId);
-        } 
-        else if (action === 'edit_note') {
-            return handleEditNote(interaction, noteId);
+    // ── Manage Notes ──
+    if (id === 'notes_manage') {
+        const userNotes = getUserNotes(interaction.user.id);
+        if (userNotes.length === 0) {
+            return interaction.reply({ content: 'You have no notes to manage!', ephemeral: true });
         }
-        else if (action === 'delete_note') {
-            return handleDeleteNote(interaction, noteId);
-        }
-        else if (action === 'confirm_delete') {
-            return confirmDeleteNote(interaction, noteId);
-        }
-    }
-    
-    return false; // Return false if no handler was found
-}
 
-// Now update the module.exports to use this centralized function
-module.exports = [
-    {
-        name: 'note',
-        description: 'Save a note',
-        execute: async function(interaction) {
-            return handleNoteCommand(interaction);
-        },
-        handleButton: async function(interaction) {
-            return handleNoteButtons(interaction);
-        }
-    },
-    {
-        name: 'getnotes',
-        description: 'View all your saved notes',
-        execute: async function(interaction) {
-            return handleGetNotesCommand(interaction);
-        },
-        handleButton: async function(interaction) {
-            const customId = interaction.customId;
-            
-            // Handle pagination buttons
-            if (customId === 'prev_page' || customId === 'next_page') {
-                // The pagination is already handled in the collector in handleGetNotesCommand
-                // No need to implement anything here as it's handled by the collector
-            }
-        }
-    },
-    {
-        name: 'getnote',
-        description: 'Retrieve a saved note',
-        execute: async function(interaction) {
-            return handleGetNoteCommand(interaction);
-        },
-        handleButton: async function(interaction) {
-            return handleNoteButtons(interaction);
-        },
-        handleModal: async function(interaction) {
-            // Keep the existing modal handler code
-            if (interaction.customId.startsWith('edit_modal_')) {
-                const noteId = interaction.customId.replace('edit_modal_', '');
-                const note = notes[noteId];
-                
-                if (!note) {
-                    return interaction.reply({ content: 'Note not found!', ephemeral: true });
-                }
-                
-                const newTitle = interaction.fields.getTextInputValue('title');
-                const newContent = interaction.fields.getTextInputValue('content');
-                
-                // If the title changed, we need to create a new note ID and delete the old one
-                if (newTitle !== note.title) {
-                    const newNoteId = createNoteId(interaction.user.id, newTitle);
-                    
-                    // Copy the note with new title and content
-                    notes[newNoteId] = {
-                        ...note,
-                        title: newTitle,
-                        content: newContent,
-                        updatedAt: new Date().toISOString()
-                    };
-                    
-                    // Delete the old note
-                    delete notes[noteId];
-                } else {
-                    // Just update the content
-                    note.content = newContent;
-                    note.updatedAt = new Date().toISOString();
-                }
-                
-                // Save the changes
-                saveNotes();
-                
-                return interaction.reply({ 
-                    content: `Note "${newTitle}" has been updated!`, 
-                    ephemeral: true 
-                });
-            }
-        }
-    }
-];
+        const selectRow = buildManageSelectMenu(userNotes);
+        const embed = new EmbedBuilder()
+            .setTitle('📋 Manage Notes')
+            .setDescription('Select a note from the menu below to view, edit, or delete it.')
+            .setColor('#3498DB')
+            .setFooter({ text: `${userNotes.length} note${userNotes.length > 1 ? 's' : ''} available` });
 
-// Implement the button handler functions
-async function handleSaveToChannel(interaction, noteId) {
-    // Implementation for saving note to channel
-    const note = notes[noteId];
-    if (!note) {
-        return interaction.reply({ content: 'Note not found!', ephemeral: true });
+        return interaction.update({ embeds: [embed], components: [selectRow] });
     }
-    
-    // Create an embed for the note
-    const embed = new EmbedBuilder()
-        .setTitle(note.title)
-        .setDescription(note.content)
-        .setColor('#2ECC71')
-        .setFooter({ text: `Note by ${interaction.user.tag}` })
-        .setTimestamp();
-    
-    // Send the note to the channel
-    await interaction.channel.send({ embeds: [embed] });
-    
-    // Update the button interaction
-    return interaction.update({ 
-        content: 'Note has been posted to the channel!', 
-        components: [] 
-    });
-}
 
-
-async function handleEditNote(interaction, noteId) {
-    const note = notes[noteId];
-    if (!note) {
-        return interaction.reply({ content: 'Note not found!', ephemeral: true });
+    // ── Back to main view ──
+    if (id === 'notes_back') {
+        const userNotes = getUserNotes(interaction.user.id);
+        const embed = buildMainEmbed(userNotes, interaction.user);
+        return interaction.update({ embeds: [embed], components: [buildMainButtons()] });
     }
-    
-    try {
+
+    // ── Save to Channel ──
+    if (id.startsWith('notes_save_')) {
+        const noteId = id.replace('notes_save_', '');
+        const note = notes[noteId];
+        if (!note) return interaction.reply({ content: 'Note not found!', ephemeral: true });
+
+        const embed = new EmbedBuilder()
+            .setTitle(note.title)
+            .setDescription(note.content)
+            .setColor('#2ECC71')
+            .setFooter({ text: `Note by ${interaction.user.tag}` })
+            .setTimestamp();
+
+        await interaction.channel.send({ embeds: [embed] });
+        return interaction.update({ content: '📌 Note posted to the channel!', embeds: [], components: [] });
+    }
+
+    // ── Edit Note ──
+    if (id.startsWith('notes_edit_')) {
+        const noteId = id.replace('notes_edit_', '');
+        const note = notes[noteId];
+        if (!note) return interaction.reply({ content: 'Note not found!', ephemeral: true });
+
         const modal = new ModalBuilder()
-            .setCustomId(`edit_modal_${noteId}`)
+            .setCustomId(`notes_edit_modal_${noteId}`)
             .setTitle('Edit Note');
 
-        const titleInput = new TextInputBuilder()
-            .setCustomId('title')
-            .setLabel('Title')
-            .setStyle(TextInputStyle.Short)
-            .setValue(note.title)
-            .setRequired(true)
-            .setMaxLength(100);
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('title')
+                    .setLabel('Title')
+                    .setStyle(TextInputStyle.Short)
+                    .setValue(note.title)
+                    .setRequired(true)
+                    .setMaxLength(100)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('content')
+                    .setLabel('Content')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setValue(note.content)
+                    .setRequired(true)
+                    .setMaxLength(4000)
+            )
+        );
 
-        const contentInput = new TextInputBuilder()
-            .setCustomId('content')
-            .setLabel('Content')
-            .setStyle(TextInputStyle.Paragraph)
-            .setValue(note.content)
-            .setRequired(true)
-            .setMaxLength(4000);
-
-        const firstRow = new ActionRowBuilder().addComponents(titleInput);
-        const secondRow = new ActionRowBuilder().addComponents(contentInput);
-
-        modal.addComponents(firstRow, secondRow);
-        await interaction.showModal(modal);
-    } catch (error) {
-        console.error('Error showing edit modal:', error);
-        await interaction.reply({ 
-            content: 'Failed to open edit modal. Please try again later.',
-            ephemeral: true
-        });
+        return interaction.showModal(modal);
     }
-}
 
-// Update the handleDeleteNote function to use consistent ID format
-async function handleDeleteNote(interaction, noteId) {
-    const note = notes[noteId];
-    if (!note) {
-        return interaction.reply({ content: 'Note not found!', ephemeral: true });
-    }
-    
-    // Create confirmation buttons with consistent format using underscores
-    const confirmRow = new ActionRowBuilder()
-        .addComponents(
+    // ── Delete Note (confirmation) ──
+    if (id.startsWith('notes_delete_')) {
+        const noteId = id.replace('notes_delete_', '');
+        const note = notes[noteId];
+        if (!note) return interaction.reply({ content: 'Note not found!', ephemeral: true });
+
+        const confirmRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`confirm_delete_${noteId}`)
+                .setCustomId(`notes_confirm_delete_${noteId}`)
                 .setLabel('Confirm Delete')
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji('🗑️'),
             new ButtonBuilder()
-                .setCustomId('cancel_delete')
+                .setCustomId('notes_cancel_delete')
                 .setLabel('Cancel')
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('❌')
         );
-    
-    // Update the interaction with confirmation buttons
-    return interaction.update({
-        content: `Are you sure you want to delete the note "${note.title}"?`,
-        components: [confirmRow]
-    });
+
+        return interaction.update({
+            content: `Are you sure you want to delete **"${note.title}"**?`,
+            embeds: [],
+            components: [confirmRow]
+        });
+    }
+
+    // ── Confirm Delete ──
+    if (id.startsWith('notes_confirm_delete_')) {
+        const noteId = id.replace('notes_confirm_delete_', '');
+        const note = notes[noteId];
+        if (!note) return interaction.reply({ content: 'Note not found!', ephemeral: true });
+
+        const title = note.title;
+        delete notes[noteId];
+        saveNotes();
+
+        // Return to main view after deletion
+        const userNotes = getUserNotes(interaction.user.id);
+        const embed = buildMainEmbed(userNotes, interaction.user);
+        return interaction.update({ content: `🗑️ Note **"${title}"** deleted.`, embeds: [embed], components: [buildMainButtons()] });
+    }
+
+    // ── Cancel Delete ──
+    if (id === 'notes_cancel_delete') {
+        const userNotes = getUserNotes(interaction.user.id);
+        const embed = buildMainEmbed(userNotes, interaction.user);
+        return interaction.update({ content: null, embeds: [embed], components: [buildMainButtons()] });
+    }
+
+    return false;
 }
 
-async function confirmDeleteNote(interaction, noteId) {
-    // Implementation for confirming note deletion
+// ── Select Menu handler ──────────────────────────────────────
+async function handleSelectMenu(interaction) {
+    if (interaction.customId !== 'notes_select') return;
+
+    const noteId = interaction.values[0];
     const note = notes[noteId];
-    if (!note) {
-        return interaction.reply({ content: 'Note not found!', ephemeral: true });
-    }
-    
-    // Delete the note
-    delete notes[noteId];
-    saveNotes();
-    
-    // Update the interaction
-    return interaction.update({
-        content: `Note "${note.title}" has been deleted.`,
-        components: []
-    });
+    if (!note) return interaction.reply({ content: 'Note not found!', ephemeral: true });
+
+    const embed = buildNoteDetailEmbed(note, interaction.user);
+    const actionRow = buildNoteActionRow(noteId);
+
+    return interaction.update({ embeds: [embed], components: [actionRow] });
 }
+
+// ── Modal handler ────────────────────────────────────────────
+async function handleModal(interaction) {
+    const id = interaction.customId;
+
+    // ── Add Note modal ──
+    if (id === 'notes_add_modal') {
+        const title = interaction.fields.getTextInputValue('title');
+        const content = interaction.fields.getTextInputValue('content');
+
+        const noteId = createNoteId(interaction.user.id, title);
+        notes[noteId] = {
+            title,
+            content,
+            userId: interaction.user.id,
+            createdAt: new Date().toISOString(),
+            author: interaction.user.username
+        };
+        saveNotes();
+
+        // Show refreshed main view
+        const userNotes = getUserNotes(interaction.user.id);
+        const embed = buildMainEmbed(userNotes, interaction.user);
+
+        return interaction.reply({ content: `✅ Note **"${title}"** saved!`, embeds: [embed], components: [buildMainButtons()], ephemeral: true });
+    }
+
+    // ── Edit Note modal ──
+    if (id.startsWith('notes_edit_modal_')) {
+        const noteId = id.replace('notes_edit_modal_', '');
+        const note = notes[noteId];
+        if (!note) return interaction.reply({ content: 'Note not found!', ephemeral: true });
+
+        const newTitle = interaction.fields.getTextInputValue('title');
+        const newContent = interaction.fields.getTextInputValue('content');
+
+        if (newTitle !== note.title) {
+            const newNoteId = createNoteId(interaction.user.id, newTitle);
+            notes[newNoteId] = { ...note, title: newTitle, content: newContent, updatedAt: new Date().toISOString() };
+            delete notes[noteId];
+        } else {
+            note.content = newContent;
+            note.updatedAt = new Date().toISOString();
+        }
+        saveNotes();
+
+        return interaction.reply({ content: `✏️ Note **"${newTitle}"** updated!`, ephemeral: true });
+    }
+}
+
+// ── Export ────────────────────────────────────────────────────
+module.exports = {
+    name: 'mynotes',
+    description: 'View and manage your personal notes',
+    execute,
+    handleButton,
+    handleSelectMenu,
+    handleModal
+};

@@ -28,7 +28,7 @@ module.exports = {
                 },
                 {
                     name: '📝 Notes',
-                    value: '`/note [title] [content] [channel]`\n`/getnotes`\n`/getnote [title]`',
+                    value: '`/mynotes`\nView, add & manage your personal notes.',
                     inline: true
                 },
                 {
@@ -49,6 +49,16 @@ module.exports = {
                 {
                     name: '✨ Wishlist',
                     value: '`/wishlist`\nView saved Movies, Books, Games, etc.',
+                    inline: true
+                },
+                {
+                    name: '🔐 Leak Check',
+                    value: '`/leakcheck [email]`\nCheck if an email has been leaked.',
+                    inline: true
+                },
+                {
+                    name: '🔗 Invite QR',
+                    value: '`/invite`\nGenerate a QR code for a Discord invite.',
                     inline: true
                 },
                 {
@@ -96,12 +106,27 @@ module.exports = {
                 },
                 {
                     name: '🎯 Trivia',
-                    value: '`/trivia [questions] [category] [difficulty]`',
+                    value: '`/trivia [questions] [category] [difficulty]`\n`/webtrivia` — browser multiplayer trivia',
+                    inline: true
+                },
+                {
+                    name: '🕹️ Codenames',
+                    value: '`/codenames`\nStart a Codenames-style word spy game.',
                     inline: true
                 },
                 {
                     name: '🎲 Fun & Quotes',
-                    value: '`/roll [numbers/names]`\n`/vote [question] [options]`\n`/quote-of-the-day`',
+                    value: '`/roll [numbers/names]`\n`/vote [question] [options]`\n`/quote-of-the-day`\n`/movie-random`',
+                    inline: true
+                },
+                {
+                    name: '🎮 Valorant',
+                    value: '`/valorant profile [name] [tag]`\n`/valorant leaderboard [region]`',
+                    inline: true
+                },
+                {
+                    name: '♟️ TFT',
+                    value: '`/tft [summoner] [tag] [region]`\nProfile & match history.',
                     inline: true
                 }
             )

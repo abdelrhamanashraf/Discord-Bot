@@ -73,44 +73,8 @@ module.exports = [
         ],
     },
     {
-        name: "note",
-        description: "Save a note",
-        options: [
-            {
-                name: "title",
-                type: 3, // STRING
-                description: "Title of the note",
-                required: true,
-            },
-            {
-                name: "content",
-                type: 3, // STRING
-                description: "Content of the note",
-                required: true,
-            },
-            {
-                name: "save_to_channel",
-                type: 5, // BOOLEAN
-                description: "Save the note to the current channel",
-                required: false,
-            },
-        ],
-    },
-    {
-        name: "getnotes",
-        description: "View all your saved notes",
-    },
-    {
-        name: "getnote",
-        description: "Retrieve a saved note",
-        options: [
-            {
-                name: "title",
-                type: 3, // STRING
-                description: "Title of the note to retrieve",
-                required: true,
-            },
-        ],
+        name: "mynotes",
+        description: "View and manage your personal notes",
     },
     {
         name: "help",
@@ -626,5 +590,9 @@ module.exports = [
                 required: true
             }
         ]
+    },
+    {
+        name: "webtrivia",
+        description: "Start a multiplayer trivia game in the browser"
     }
 ];

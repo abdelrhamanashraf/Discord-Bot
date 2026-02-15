@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon index.js",
+    "start": "nodemon --ignore data/ --ignore cache/ --ignore public/ --ext js index.js",
     "deploy": "node deploy-commands.js"
   },
   "keywords": [],
@@ -24,7 +24,8 @@
     "openai": "^6.7.0",
     "qrcode": "^1.5.3",
     "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.8.3",
     "uuid": "^9.0.1",
-    "whatsapp-web.js": "^1.24.0"
+    "whatsapp-web.js": "^1.34.6"
   }
 }
